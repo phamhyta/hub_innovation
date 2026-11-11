@@ -1,0 +1,21 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Dữ liệu chạy local (sinh lại được bằng scripts.reset_demo)
+poc/backend/innovation_hub.db
+poc/data/storage/
+poc/data/import_report.json
+
+# Máy/IDE
+.DS_Store
+.claude/
+.vercel/
+.env
+.env.*
+
+# Tài liệu gốc của khách hàng ở thư mục gốc (bản dùng cho app nằm ở poc/data/raw)
+/Tài liệu mô tả.docx
+/indicator_survey.xlsx

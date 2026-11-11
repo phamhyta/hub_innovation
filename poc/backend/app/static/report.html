@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Báo cáo chỉ tiêu KH,CN, ĐMST &amp; CĐS</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/common.js"></script>
+<style>
+  .doc { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 28px 32px; }
+  .doc h1 { font-size: 20px; margin: 0 0 4px; text-align: center; }
+  .doc .meta { text-align: center; color: var(--muted); font-size: 12px; margin-bottom: 18px; }
+  .doc table td, .doc table th { font-size: 12px; padding: 5px 7px; }
+  @media print { .doc { border: 0; padding: 0; } @page { size: A4 landscape; margin: 14mm; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="filters no-print" style="justify-content:space-between">
+    <a href="/">← Tổng quan</a>
+    <div><button class="btn primary" onclick="print()">🖨 In / Lưu PDF</button> <a class="btn" id="xlsx">⬇ Excel</a></div>
+  </div>
+  <div class="doc">
+    <h1>BÁO CÁO TÌNH HÌNH THỰC HIỆN CHỈ TIÊU KH,CN, ĐMST &amp; CĐS</h1>
+    <div class="meta" id="meta"></div>
+    <h3>1. Tổng quan</h3>
+    <div id="summary"></div>
+    <h3>2. Số liệu các chỉ tiêu đã công bố</h3>
+    <table id="tbl"></table>
+    <h3>3. Ghi chú phương pháp</h3>
+    <ul class="small">
+      <li>Chỉ gồm số liệu đã được duyệt và công bố trên Innovation Hub. Khi nhiều nguồn cùng có số, ưu tiên: đơn vị chủ trì báo cáo → nguồn công khai/quốc tế → trích từ tài liệu → tự tính.</li>
+      <li>Mức tin cậy: A nguồn chuẩn quốc tế/chính thức · B chính thức cần xử lý · C dữ liệu hành chính · D khảo sát/đánh giá.</li>
+      <li>Thứ hạng: số nhỏ hơn là tốt hơn. OpenAlex (0201) thay thế Scopus/WoS; World Bank (0405) là chỉ số tham chiếu khác mẫu số.</li>
+      <li><b>Số liệu do đơn vị nộp trong bản PoC là giả lập.</b></li>
+    </ul>
+  </div>
+</main>
+<script>
+renderHeader("/");
+const year = Number(new URLSearchParams(location.search).get("year")) || new Date().getFullYear() - 1;
+const years = [0, 1, 2, 3, 4].map((i) => String(year - 4 + i));
+$("xlsx").href = `/api/reports/indicators.xlsx?year=${year}`;
+(async () => {
+  const d = await api("/api/dashboard");
+  const k = d.kpis;
+  $("meta").textContent = `Kỳ báo cáo: năm ${year} · Lập lúc ${new Date().toLocaleString("vi-VN")} · Nguồn: Innovation Hub (PoC)`;
+  $("summary").innerHTML = `<p>Trong ${k.indicators} chỉ tiêu theo QĐ 2244/QĐ-TTg, <b>${k.with_published}</b> chỉ tiêu đã có số liệu được công bố; ${k.indicators_pending_only} chỉ tiêu khác đã có số liệu đang chờ duyệt (${k.pending_points} điểm dữ liệu).</p>
+    <table><thead><tr><th>Trụ cột</th><th class="num">Số chỉ tiêu</th><th class="num">Đã có số liệu công bố</th></tr></thead><tbody>${d.pillars.map((p) => `<tr><td>${esc(p.label)}</td><td class="num">${p.total}</td><td class="num">${p.published}</td></tr>`).join("")}</tbody></table>`;
+  $("tbl").innerHTML = `<thead><tr><th>Mã</th><th>Chỉ tiêu</th><th>Giá trị tiêu biểu</th><th>Đơn vị</th>${years.map((y) => `<th class="num">${y}</th>`).join("")}<th>Mục tiêu</th><th>Nguồn</th><th>TC</th></tr></thead><tbody>` +
+    d.headlines.map((h) => {
+      const byY = Object.fromEntries(h.series.map((p) => [p.period, p.value]));
+      return `<tr><td class="code">${esc(h.code)}</td><td>${esc(h.name)}</td><td class="small">${esc(h.breakdown)}</td><td class="small">${esc(h.unit || "")}</td>${years.map((y) => `<td class="num">${byY[y] != null ? fmt(byY[y]) : "–"}</td>`).join("")}<td class="num">${h.target_value != null ? fmt(h.target_value) : ""}</td><td class="small">${esc(h.latest.origin_label)}</td><td>${esc(h.latest.confidence || "")}</td></tr>`;
+    }).join("") + "</tbody>";
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Innovation Hub – Duyệt dữ liệu</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/common.js"></script>
+</head>
+<body>
+<main>
+  <section class="stats" id="stats"></section>
+  <section class="filters">
+    <select id="status"><option value="needs_review">Chờ duyệt</option><option value="published">Đã công bố</option><option value="rejected">Đã từ chối</option></select>
+    <select id="indicator"><option value="">Mọi chỉ tiêu</option></select>
+    <select id="origin"><option value="">Mọi nguồn</option></select>
+    <select id="geography"><option value="Toàn quốc">Toàn quốc</option><option value="*">Mọi địa bàn (gồm tỉnh)</option></select>
+    <span id="scope" class="small"></span>
+    <span class="spacer" style="flex:1"></span>
+    <label class="small muted">Người duyệt <input id="reviewer" class="field" style="width:170px" placeholder="Họ tên"></label>
+  </section>
+  <div class="filters">
+    <span class="count" id="count"></span>
+    <button class="btn ok sm" id="approveSel" disabled>✓ Duyệt &amp; công bố mục đã chọn</button>
+    <button class="btn danger sm" id="rejectSel" disabled>✕ Từ chối mục đã chọn</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th><input type="checkbox" id="all"></th><th>Chỉ tiêu</th><th>Kỳ</th><th class="hide-sm">Địa bàn</th><th>Phân tổ</th><th class="num">Giá trị</th><th class="hide-sm">Đối chiếu nguồn khác</th><th>Nguồn</th><th class="hide-sm">Đoạn trích / minh chứng</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</main>
+<script>
+renderHeader("/review");
+const params = new URLSearchParams(location.search);
+const scope = { submission_id: params.get("submission_id"), crawl_run_id: params.get("crawl_run_id") };
+let items = [];
+
+async function init() {
+  $("reviewer").value = reviewerName();
+  $("reviewer").addEventListener("change", () => setReviewerName($("reviewer").value.trim()));
+  if (params.get("geography")) $("geography").value = params.get("geography");
+  if (params.get("status")) $("status").value = params.get("status");
+  const [inds, sum] = await Promise.all([api("/api/indicators?framework=QD2244"), api("/api/review/summary")]);
+  $("indicator").innerHTML += inds.map((i) => `<option value="${esc(i.code)}">${esc(i.code)} – ${esc(i.name.slice(0, 60))}</option>`).join("");
+  $("origin").innerHTML += Object.keys(sum.by_origin).filter((o) => !o.startsWith("calc:")).sort().map((o) => `<option>${esc(o)}</option>`).join("");
+  if (params.get("indicator")) $("indicator").value = params.get("indicator");
+  const sc = scope.submission_id ? `lượt nộp #${scope.submission_id}` : scope.crawl_run_id ? `lần chạy #${scope.crawl_run_id}` : "";
+  if (sc) $("scope").innerHTML = `<span class="tag">Chỉ xem ${esc(sc)}</span> <a href="/review">bỏ lọc</a>`;
+  ["status", "indicator", "origin", "geography"].forEach((id) => $(id).addEventListener("change", load));
+  renderStats(sum);
+  load();
+}
+
+function renderStats(s) {
+  refreshBadge(s);
+  const b = s.by_status;
+  $("stats").innerHTML = [[b.needs_review || 0, "Chờ duyệt"], [b.published || 0, "Đã công bố"], [b.rejected || 0, "Đã từ chối"], [s.indicators_with_published_data, "Chỉ tiêu đã có dữ liệu công bố"]]
+    .map(([v, l]) => `<div class="stat"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+}
+
+async function load() {
+  const p = new URLSearchParams({ status: $("status").value, geography: $("geography").value, limit: 1000 });
+  if ($("indicator").value) p.set("indicator", $("indicator").value);
+  if ($("origin").value) p.set("origin", $("origin").value);
+  for (const [k, v] of Object.entries(scope)) if (v) p.set(k, v);
+  const r = await api("/api/review?" + p);
+  items = r.items;
+  $("count").textContent = `${r.total} điểm dữ liệu${r.total > items.length ? ` (hiển thị ${items.length})` : ""}`;
+  $("all").checked = false;
+  const canApprove = $("status").value !== "published", canReject = $("status").value !== "rejected";
+  $("rows").innerHTML = items.map((p) => {
+    const cmp = p.compare ? `${fmt(p.compare.value)} <span class="small muted">(${esc(p.compare.origin)})</span>${p.compare.diff_pct != null ? `<div class="${Math.abs(p.compare.diff_pct) > 25 ? "warn-text" : "small muted"}">lệch ${p.compare.diff_pct > 0 ? "+" : ""}${p.compare.diff_pct.toFixed(1)}%</div>` : ""}` : '<span class="muted small">–</span>';
+    const prev = p.meta.previous_value != null ? `<div class="small muted">trước: ${fmt(p.meta.previous_value)}</div>` : "";
+    const ev = p.evidence_file_id ? `<a class="small" href="/api/evidence/${p.evidence_file_id}" target="_blank">minh chứng ↓</a>` : "";
+    const src = p.meta.doc_url || p.meta.evidence_url;
+    return `<tr>
+      <td><input type="checkbox" class="sel" value="${p.id}"></td>
+      <td><span class="code">${esc(p.indicator_code)}</span><div class="small muted">${esc(p.indicator_name.slice(0, 50))}</div></td>
+      <td>${esc(p.period)}</td>
+      <td class="hide-sm">${esc(p.geography)}</td>
+      <td>${esc(p.breakdown)}${p.warnings.map((w) => `<div class="warn-text">⚠ ${esc(w)}</div>`).join("")}${p.meta.method_note ? `<div class="small muted">${esc(p.meta.method_note)}</div>` : ""}</td>
+      <td class="num"><b>${fmt(p.value)}</b> <span class="small muted">${esc(p.unit || "")}</span>${prev}</td>
+      <td class="hide-sm">${cmp}</td>
+      <td><span class="tag">${esc(p.origin)}</span> ${conf(p.confidence)}</td>
+      <td class="hide-sm"><div class="excerpt">${esc(p.excerpt || "")}</div>${ev} ${src ? `<a class="small" href="${esc(src)}" target="_blank" rel="noopener">nguồn ↗</a>` : ""}</td>
+      <td style="white-space:nowrap">${canApprove ? `<button class="btn ok sm" onclick="act([${p.id}],'approve')">✓</button>` : ""} ${canReject ? `<button class="btn danger sm" onclick="act([${p.id}],'reject')">✕</button>` : ""}</td>
+    </tr>`;
+  }).join("") || '<tr><td colspan="10" class="muted">Không có điểm dữ liệu nào.</td></tr>';
+  $("approveSel").hidden = !canApprove; $("rejectSel").hidden = !canReject;
+  document.querySelectorAll(".sel").forEach((c) => c.addEventListener("change", updateSel));
+  updateSel();
+}
+
+const selected = () => [...document.querySelectorAll(".sel:checked")].map((c) => Number(c.value));
+function updateSel() { const n = selected().length; $("approveSel").disabled = $("rejectSel").disabled = !n; $("approveSel").textContent = `✓ Duyệt & công bố ${n || ""} mục đã chọn`; $("rejectSel").textContent = `✕ Từ chối ${n || ""} mục đã chọn`; }
+$("all").addEventListener("change", (e) => { document.querySelectorAll(".sel").forEach((c) => (c.checked = e.target.checked)); updateSel(); });
+$("approveSel").onclick = () => act(selected(), "approve");
+$("rejectSel").onclick = () => act(selected(), "reject");
+
+async function act(ids, action) {
+  const reviewer = $("reviewer").value.trim();
+  if (!reviewer) { toast("Nhập tên người duyệt trước (ô góc phải)"); $("reviewer").focus(); return; }
+  setReviewerName(reviewer);
+  let note = null;
+  if (action === "reject") { note = prompt(`Lý do từ chối ${ids.length} điểm dữ liệu:`); if (!note) return; }
+  try {
+    const r = await api("/api/review/actions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids, action, reviewer, note }) });
+    toast(`${action === "approve" ? "Đã công bố" : "Đã từ chối"} ${r.changed.length} điểm${r.skipped.length ? `, bỏ qua ${r.skipped.length}` : ""}`);
+  } catch (e) { toast("Lỗi: " + e.message); }
+  renderStats(await api("/api/review/summary"));
+  load();
+}
+
+init();
+</script>
+</body>
+</html>

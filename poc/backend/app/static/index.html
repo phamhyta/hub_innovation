@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Innovation Hub – Registry chỉ tiêu</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/common.js"></script>
+</head>
+<body>
+<main>
+  <div class="filters" style="justify-content:space-between">
+    <div class="muted">Registry: QĐ 2244 · QĐ 3994 · Tiêu chí đánh giá chương trình</div>
+    <span id="tpl"></span>
+  </div>
+  <section class="stats" id="stats"></section>
+
+  <section class="filters">
+    <input id="q" type="search" placeholder="Tìm theo mã hoặc tên chỉ tiêu (không cần dấu)…">
+    <select id="framework"><option value="">Mọi văn bản</option><option value="QD2244">QĐ 2244</option><option value="QD3994">QĐ 3994 (BKHCN)</option><option value="PROGRAM">Tiêu chí chương trình</option><option value="PROPOSED">Đề xuất mới (DX)</option></select>
+    <select id="pillar"><option value="">Mọi trụ cột</option><option value="input">Đầu vào</option><option value="output">Kết quả</option><option value="efficiency">Hiệu quả</option><option value="impact">Tác động</option></select>
+    <select id="collection_type"><option value="">Mọi cách thu thập</option></select>
+    <select id="confidence"><option value="">Mọi mức tin cậy</option><option>A</option><option>B</option><option>C</option><option>D</option></select>
+    <select id="mvp"><option value="">Mọi giai đoạn MVP</option><option>MVP-1</option><option>MVP-2</option><option>MVP-3</option></select>
+    <select id="agency_id"><option value="">Mọi cơ quan</option></select>
+  </section>
+  <div class="count" id="count"></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Mã</th><th>Chỉ tiêu</th><th class="hide-sm">Trụ cột / nhóm</th><th class="hide-sm">Thu thập</th><th>Tin cậy</th><th>MVP</th><th class="hide-sm">Chủ trì</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</main>
+
+<div id="drawerRoot">
+  <div class="backdrop" onclick="closeDrawer()"></div>
+  <aside class="drawer" id="drawer"></aside>
+</div>
+
+<script>
+renderHeader("/registry");
+const PILLAR = { input: "Đầu vào", output: "Kết quả", efficiency: "Hiệu quả", impact: "Tác động" };
+const CT = { crawl_api: "Crawl/API", doc_etl: "Doc-ETL", manual_admin: "Manual/Admin", survey_assessment: "Survey/Đánh giá", analytical: "Phân tích", official_integration: "Tích hợp hệ thống" };
+const FW = { QD2244: "QĐ 2244", QD3994: "QĐ 3994", PROGRAM: "Chương trình", PROPOSED: "Đề xuất mới" };
+const ROLE = { lead: "Chủ trì", coordinate: "Phối hợp" };
+const FILTERS = ["q", "framework", "pillar", "collection_type", "confidence", "mvp", "agency_id"];
+
+async function init() {
+  Object.entries(CT).forEach(([k, v]) => $("collection_type").insertAdjacentHTML("beforeend", `<option value="${k}">${v}</option>`));
+  const [stats, agencies, tpls, rs] = await Promise.all([api("/api/indicators/stats"), api("/api/agencies"), api("/api/templates"), api("/api/review/summary")]);
+  agencies.filter((a) => a.lead_count + a.coordinate_count > 0)
+    .forEach((a) => $("agency_id").insertAdjacentHTML("beforeend", `<option value="${a.id}">${esc(a.name)} (${a.lead_count + a.coordinate_count})</option>`));
+  if (tpls.length) $("tpl").innerHTML = `<a class="btn primary" href="${tpls[0].download_url}">⬇ Tải template ${tpls[0].indicators.join(" + ")}</a>`;
+  const fw = stats.by_framework, c = stats.by_confidence, m = stats.by_mvp;
+  $("stats").innerHTML = [
+    [stats.indicators, "Chỉ tiêu gốc"],
+    [stats.framework_entries, `Bản ghi theo văn bản (${fw.QD2244 || 0} + ${fw.QD3994 || 0} + ${fw.PROGRAM || 0}${fw.PROPOSED ? " + " + fw.PROPOSED + " đề xuất" : ""})`],
+    [m["MVP-1"] || 0, "Ưu tiên MVP-1"],
+    [rs.indicators_with_published_data || 0, "Chỉ tiêu đã có dữ liệu công bố"],
+    [rs.by_status.needs_review || 0, "Điểm dữ liệu chờ duyệt"],
+    [stats.aliases, "Xung đột mã cần đối chiếu"],
+  ].map(([v, l]) => `<div class="stat"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+  FILTERS.forEach((id) => $(id).addEventListener("input", debounce(load, 200)));
+  load();
+}
+
+function debounce(fn, ms) { let t; return () => { clearTimeout(t); t = setTimeout(fn, ms); }; }
+
+async function load() {
+  const p = new URLSearchParams();
+  FILTERS.forEach((id) => { if ($(id).value) p.set(id, $(id).value); });
+  const items = await api("/api/indicators?" + p);
+  $("count").textContent = `${items.length} chỉ tiêu`;
+  $("rows").innerHTML = items.map((i) => `
+    <tr class="click" onclick="openDrawer('${esc(i.code)}')">
+      <td class="code">${esc(i.code)}${i.alias_codes.length ? `<div class="alias">≈ ${i.alias_codes.map(esc).join(", ")}</div>` : ""}</td>
+      <td>${esc(i.name)}<div>${i.frameworks.map((f) => `<span class="tag">${FW[f]}</span>`).join("")}</div></td>
+      <td class="hide-sm">${esc(PILLAR[i.pillar] || "")}<div class="muted">${esc(i.group_code || "")} ${esc(i.group_name || "")}</div></td>
+      <td class="hide-sm">${i.collection_types.map((t) => `<span class="tag">${CT[t] || t}</span>`).join("")}</td>
+      <td>${conf(i.confidence)}</td>
+      <td style="white-space:nowrap">${esc(i.mvp_priority || "")}</td>
+      <td class="hide-sm">${i.lead_agencies.map(esc).join("<br>")}</td>
+    </tr>`).join("");
+}
+
+function dataTable(points) {
+  if (!points.length) return '<div class="muted">Chưa có dữ liệu cấp toàn quốc. Dữ liệu đến từ upload của đơn vị, connector hoặc Doc-ETL.</div>';
+  const groups = {};
+  points.forEach((p) => (groups[p.breakdown + " · " + p.origin] ||= []).push(p));
+  return Object.entries(groups).map(([k, ps]) => {
+    const [bd, origin] = [ps[0].breakdown, ps[0].origin];
+    return `<div class="entry"><div class="hd"><b>${esc(bd)}</b><span class="tag">${esc(origin)}</span>${conf(ps[0].confidence)}</div>
+      <div class="small">${ps.sort((a, b) => a.period.localeCompare(b.period)).map((p) =>
+        `<span title="${esc(STATUS[p.status])}" style="margin-right:12px;white-space:nowrap">${esc(p.period)}: <b>${fmt(p.value)}</b> ${esc(p.unit || "")}${p.status !== "published" ? ` <span class="status st-${p.status}">${esc(STATUS[p.status])}</span>` : ""}</span>`).join(" ")}</div></div>`;
+  }).join("");
+}
+
+async function openDrawer(code) {
+  const [d, pts] = await Promise.all([api("/api/indicators/" + encodeURIComponent(code)), api(`/api/indicators/${encodeURIComponent(code)}/data`)]);
+  const entries = d.entries.map((e) => `
+    <div class="entry">
+      <div class="hd"><span class="tag">${FW[e.framework]}</span><span class="code">${esc(e.code_in_framework)}</span>${conf(e.confidence)}<span class="tag">${esc(e.mvp_priority || "")}</span><span class="muted">${esc(e.source_sheet)} · dòng ${e.source_row}</span></div>
+      ${e.name_in_framework !== d.name ? `<div><i>${esc(e.name_in_framework)}</i></div>` : ""}
+      <div class="kv">
+        <div class="k">Nhóm</div><div>${esc(e.group_name)}</div>
+        <div class="k">Phương án thu thập</div><div>${esc(e.collection_method)}</div>
+        <div class="k">Khuyến nghị</div><div>${esc(e.automation_recommendation)} · tự động hoá ${esc(e.automation_level)}</div>
+        ${["lead", "coordinate"].map((r) => {
+          const a = e.assignments.filter((x) => x.role === r);
+          return a.length ? `<div class="k">${ROLE[r]}</div><div>${a.map((x) => esc(x.agency.name)).join("; ")}</div>` : "";
+        }).join("")}
+      </div>
+      ${e.notes ? `<div class="notes">${esc(e.notes)}</div>` : ""}
+    </div>`).join("");
+  const val = (v) => esc(v ?? "");
+  const live = pts.filter((p) => p.status !== "rejected");
+  $("drawer").innerHTML = `
+    <button class="btn close" onclick="closeDrawer()">Đóng ✕</button>
+    <div class="code">${esc(d.code)}</div>
+    <h2>${esc(d.name)}</h2>
+    <div>${conf(d.confidence)} <span class="tag">${esc(d.mvp_priority || "")}</span> <span class="tag">${esc(PILLAR[d.pillar] || "")}</span> ${d.collection_types.map((t) => `<span class="tag">${CT[t] || t}</span>`).join("")}</div>
+    ${d.aliases.map((a) => `<div class="warnbox">⚠ ${esc(a.note)}</div>`).join("")}
+
+    <h3>Dữ liệu toàn quốc (${live.length} điểm)</h3>
+    ${dataTable(live)}
+
+    <h3>Thông tin nghiệp vụ (admin bổ sung)</h3>
+    <form class="edit" onsubmit="save(event, '${esc(d.code)}')">
+      <label class="full">Định nghĩa<textarea name="definition">${val(d.definition)}</textarea></label>
+      <label class="full">Công thức tính<textarea name="formula">${val(d.formula)}</textarea></label>
+      <label>Đơn vị<input name="unit" value="${val(d.unit)}"></label>
+      <label>Tần suất<input name="frequency" value="${val(d.frequency)}" placeholder="năm / quý / tháng"></label>
+      <label>Giá trị mục tiêu<input name="target_value" type="number" step="any" value="${val(d.target_value)}"></label>
+      <label>Năm mục tiêu<input name="target_year" type="number" value="${val(d.target_year)}" placeholder="2030"></label>
+      <div class="full"><button class="btn primary">Lưu</button><span class="saved" id="saved"></span></div>
+    </form>
+
+    <h3>Theo từng văn bản (${d.entries.length})</h3>
+    ${entries}
+
+    <h3>Nguồn dữ liệu (${d.sources.length})</h3>
+    ${d.sources.length ? `<ul class="src">${d.sources.map((s) => `<li><b>${esc(s.name)}</b>${s.approved ? ' <span class="tag">đã duyệt – có connector</span>' : ""}${s.requires_license ? ' <span class="alias">cần license</span>' : ""}<br><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.url)}</a></li>`).join("")}</ul>` : '<div class="muted">Chưa có link nguồn.</div>'}
+  `;
+  document.body.classList.add("open");
+}
+
+function closeDrawer() { document.body.classList.remove("open"); }
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
+
+async function save(ev, code) {
+  ev.preventDefault();
+  const f = new FormData(ev.target), body = {};
+  for (const [k, v] of f.entries()) body[k] = v === "" ? null : (k.startsWith("target_") ? Number(v) : v);
+  try {
+    await api("/api/indicators/" + encodeURIComponent(code), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    $("saved").textContent = "Đã lưu ✓";
+  } catch (e) { $("saved").textContent = "Lỗi khi lưu: " + e.message; }
+}
+
+init();
+</script>
+</body>
+</html>

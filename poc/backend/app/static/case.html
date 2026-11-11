@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Innovation Hub – Scorecard</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/common.js"></script>
+</head>
+<body>
+<main>
+  <div class="small no-print"><a href="/cases">← Danh sách case</a></div>
+  <div id="warn"></div>
+  <div id="top"></div>
+
+  <h2 class="section">Điểm theo nhóm tiêu chí</h2>
+  <div class="card" id="groups"></div>
+
+  <h2 class="section">Chi tiết 50 tiêu chí</h2>
+  <div class="filters no-print">
+    <label class="small"><input type="checkbox" id="onlyScored" checked> Chỉ hiện tiêu chí đã có điểm</label>
+    <span class="spacer" style="flex:1"></span>
+    <label class="small muted">Người duyệt <input id="reviewer" class="field" style="width:170px" placeholder="Họ tên"></label>
+    <button class="btn" id="compute">↻ Tính lại từ OpenAlex</button>
+    <button class="btn" onclick="print()">🖨 In scorecard</button>
+  </div>
+  <div class="table-wrap"><table id="crit"></table></div>
+
+  <div class="grid2 no-print" style="margin-top:20px">
+    <section class="card">
+      <h2 class="section" style="margin-top:0">Chấm TRL (TECH-01)</h2>
+      <div id="trlSuggest" class="small"></div>
+      <form id="trlForm" class="edit" style="margin-top:8px">
+        <label class="full">Mức TRL<select class="field" name="level" id="trlLevel"></select></label>
+        <label class="full">Căn cứ / minh chứng<textarea class="field" name="rationale" required minlength="3" rows="2"></textarea></label>
+        <label class="full">Người/hội đồng chấm<input class="field" name="assessor" required></label>
+        <div class="full"><button class="btn primary">Lưu điểm TRL</button></div>
+      </form>
+    </section>
+    <section class="card">
+      <h2 class="section" style="margin-top:0">Nhập tiêu chí khác</h2>
+      <form id="manForm" class="edit">
+        <label class="full">Tiêu chí<select class="field" name="code" id="manCode"></select></label>
+        <label>Giá trị đạt được<input class="field" name="value" type="number" step="any" required></label>
+        <label>Mục tiêu đăng ký<input class="field" name="target" type="number" step="any" min="0" required></label>
+        <label>Đơn vị<input class="field" name="unit"></label>
+        <label>Chiều đánh giá<select class="field" name="higher_is_better"><option value="true">Càng cao càng tốt</option><option value="false">Càng thấp càng tốt</option></select></label>
+        <label class="full">Ghi chú<input class="field" name="note"></label>
+        <label class="full">Link minh chứng<input class="field" name="evidence_url" type="url" placeholder="https://…"></label>
+        <div class="full"><button class="btn primary">Lưu</button></div>
+      </form>
+    </section>
+  </div>
+</main>
+<script>
+renderHeader("/cases");
+const qs = new URLSearchParams(location.search), id = qs.get("id");
+const METHOD = { openalex: "OpenAlex", derived: "Suy ra", declared: "Kê khai", rubric: "Hội đồng chấm", manual: "Nhập tay" };
+const CSTATUS = { needs_review: ["st-needs_review", "Chờ duyệt"], verified: ["st-published", "Đã xác nhận"], rejected: ["st-rejected", "Loại"] };
+let sc = null;
+
+function scoreBar(s) {
+  if (s == null) return '<span class="muted">–</span>';
+  return `<div style="display:flex;align-items:center;gap:6px"><div class="bar" style="flex:1;min-width:60px"><span class="b1" style="width:${s}%"></span></div><b style="min-width:28px;text-align:right">${s.toFixed(0)}</b></div>`;
+}
+
+function render() {
+  const c = sc.case, m = c.meta, lc = m.last_computed || {};
+  $("top").innerHTML = `
+    <h2 style="margin:8px 0 4px">${esc(c.name)} ${m.demo ? '<span class="tag">giả lập</span>' : ""}</h2>
+    <p class="muted small">${esc(c.description || "")}</p>
+    <section class="stats">
+      <div class="stat"><div class="score-big">${sc.overall != null ? sc.overall.toFixed(1) : "–"}<span class="small muted">/100</span></div><div class="l">Điểm tổng (trung bình các nhóm)</div></div>
+      <div class="stat" style="grid-column:span 2"><div style="font-weight:600;font-size:15px">${esc(sc.verdict)}</div>
+        <div class="small muted">${sc.provisional ? '<span class="status st-needs_review">Tạm tính</span> còn tiêu chí chưa được xác nhận · ' : ""}${sc.coverage.scored}/${sc.coverage.total} tiêu chí có điểm</div>
+        ${sc.strengths.length ? `<div class="small">Điểm mạnh: ${sc.strengths.map(esc).join(", ")}</div>` : ""}${sc.weaknesses.length ? `<div class="small">Cần cải thiện: ${sc.weaknesses.map(esc).join(", ")}</div>` : ""}</div>
+      <div class="stat"><div class="v">${m.dois ? m.dois.length : 0} DOI · ${m.author_ids ? m.author_ids.length : 0} TG</div><div class="l">${lc.at ? "Tính lúc " + when(lc.at) : "Chưa tính"}${m.budget_billion_vnd ? ` · kinh phí ${fmt(m.budget_billion_vnd)} tỷ` : ""}</div></div>
+    </section>`;
+  $("groups").innerHTML = sc.groups.map((g) => `<div style="display:grid;grid-template-columns:minmax(140px,220px) 1fr 90px;gap:10px;align-items:center;margin:6px 0">
+      <div>${esc(g.group_code)}. ${esc(g.group_name)}</div><div>${scoreBar(g.score)}</div><div class="small muted">${g.scored}/${g.total} tiêu chí</div></div>`).join("");
+  const only = $("onlyScored").checked;
+  let last = null, rows = "";
+  for (const r of sc.criteria) {
+    if (only && r.value == null) continue;
+    if (r.group_code !== last) { rows += `<tr class="pillar"><td colspan="8" style="background:var(--bg);font-weight:600">${esc(r.group_code)}. ${esc(r.group_name)}</td></tr>`; last = r.group_code; }
+    const st = CSTATUS[r.status];
+    const ev = r.evidence_ids.map((e) => `<a href="/api/evidence/${e}" class="small">dữ liệu nguồn ↓</a>`).join(" ") + (r.evidence_url ? ` <a class="small" href="${esc(r.evidence_url)}" target="_blank" rel="noopener">minh chứng ↗</a>` : "");
+    rows += `<tr><td class="code">${esc(r.code)}</td><td>${esc(r.name)}<div class="excerpt">${esc(r.rationale || r.rule_note || "")}</div>${ev}</td>
+      <td class="num">${r.value != null ? fmt(r.value) : "–"} <span class="small muted">${esc(r.unit || "")}</span></td>
+      <td class="num">${r.target != null ? fmt(r.target) : "–"}${r.higher_is_better === false ? '<div class="small muted">tối đa</div>' : ""}</td>
+      <td style="min-width:130px">${scoreBar(r.score)}</td><td><span class="tag">${esc(METHOD[r.method] || r.method)}</span></td>
+      <td>${st ? `<span class="status ${st[0]}">${st[1]}</span>` : ""}</td>
+      <td class="no-print" style="white-space:nowrap">${r.value != null ? `<button class="btn ok sm" onclick="rev('${r.code}','approve')">✓</button> <button class="btn danger sm" onclick="rev('${r.code}','reject')">✕</button>` : ""}</td></tr>`;
+  }
+  $("crit").innerHTML = `<thead><tr><th>Mã</th><th>Tiêu chí</th><th class="num">Đạt</th><th class="num">Mục tiêu</th><th>Điểm</th><th>Cách lấy</th><th>Trạng thái</th><th class="no-print"></th></tr></thead><tbody>${rows}</tbody>`;
+  $("trlLevel").innerHTML = Object.entries(sc.trl_levels).map(([k, v]) => `<option value="${k}" ${m.trl && m.trl.level == k ? "selected" : ""}>TRL ${k} – ${esc(v)}</option>`).join("");
+  const auto = new Set(["SCI-01", "SCI-04", "SCI-06", "SCI-07", "SCI-08", "TECH-01", "TECH-02", "TECH-07"]);
+  $("manCode").innerHTML = sc.criteria.filter((r) => !auto.has(r.code)).map((r) => `<option value="${esc(r.code)}">${esc(r.code)} – ${esc(r.name.slice(0, 70))}</option>`).join("");
+}
+
+async function load() { sc = await api("/api/cases/" + id); render(); }
+
+async function rev(code, action) {
+  const reviewer = $("reviewer").value.trim();
+  if (!reviewer) { toast("Nhập tên người duyệt trước"); $("reviewer").focus(); return; }
+  setReviewerName(reviewer);
+  let note = null;
+  if (action === "reject") { note = prompt(`Lý do loại điểm ${code}:`); if (!note) return; }
+  try { sc = await api(`/api/cases/${id}/scores/${encodeURIComponent(code)}/review`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, reviewer, note }) }); render(); }
+  catch (e) { toast("Lỗi: " + e.message); }
+}
+
+$("compute").onclick = async () => {
+  $("compute").disabled = true; $("compute").textContent = "Đang lấy dữ liệu OpenAlex…";
+  try { const r = await api(`/api/cases/${id}/compute`, { method: "POST" }); sc = r.scorecard; render(); toast(`Đã tính lại: ${r.summary.articles ?? 0} bài, ${r.summary.authors_found ?? 0} tác giả tìm thấy`); }
+  catch (e) { toast(e.message, 8000); }
+  $("compute").disabled = false; $("compute").textContent = "↻ Tính lại từ OpenAlex";
+};
+$("onlyScored").addEventListener("change", render);
+
+$("trlForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  try { sc = await api(`/api/cases/${id}/trl`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ level: Number(fd.get("level")), rationale: fd.get("rationale"), assessor: fd.get("assessor") }) }); render(); toast("Đã lưu TRL"); }
+  catch (err) { toast("Lỗi: " + err.message); }
+});
+$("manForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target), body = Object.fromEntries(fd.entries());
+  body.value = Number(body.value); body.target = Number(body.target); body.higher_is_better = body.higher_is_better === "true";
+  for (const k of ["unit", "note", "evidence_url"]) if (!body[k]) delete body[k];
+  try { sc = await api(`/api/cases/${id}/manual`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); render(); toast(`Đã lưu ${body.code}`); e.target.reset(); }
+  catch (err) { toast("Lỗi: " + err.message); }
+});
+
+(async () => {
+  $("reviewer").value = reviewerName();
+  if (qs.get("warn")) $("warn").innerHTML = `<div class="warnbox">${esc(qs.get("warn"))}</div>`;
+  await load();
+  const s = await api(`/api/cases/${id}/trl-suggestion`);
+  $("trlSuggest").innerHTML = s.level ? `Gợi ý tự động: <b>TRL ${s.level}</b> (từ khoá: ${s.matched.map(esc).join(", ")}). <span class="muted">${esc(s.note)}</span>` : `<span class="muted">${esc(s.note)}</span>`;
+  if (qs.get("compute")) $("compute").click();
+})();
+</script>
+</body>
+</html>

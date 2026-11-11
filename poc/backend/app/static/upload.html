@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Innovation Hub – Nộp số liệu</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/common.js"></script>
+</head>
+<body>
+<main>
+  <div class="grid2">
+    <section class="card">
+      <h2 class="section" style="margin-top:0">1. Nộp file theo template</h2>
+      <p class="muted small">Tải template, điền số liệu, rồi kéo thả file .xlsx vào đây. Hệ thống kiểm tra từng dòng; file có lỗi sẽ không được nhập.</p>
+      <p><span id="tpl" class="muted small">Đang tải…</span></p>
+      <div class="dropzone" id="dz">Kéo thả file <b>.xlsx</b> vào đây hoặc
+        <label class="btn" style="margin-left:6px">Chọn file<input id="xlsx" type="file" accept=".xlsx" hidden></label>
+      </div>
+    </section>
+    <section class="card">
+      <h2 class="section" style="margin-top:0">2. Trích số liệu từ tài liệu (Doc-ETL)</h2>
+      <p class="muted small">Báo cáo PDF/HTML/TXT chưa có cấu trúc. Hệ thống tìm số liệu cho chỉ tiêu đã chọn, kèm đoạn trích để người duyệt đối chiếu.</p>
+      <form id="docForm" class="edit">
+        <label class="full">Chỉ tiêu<select class="field" name="indicator_code" id="docInd" required></select></label>
+        <label>Kỳ mặc định (năm)<input class="field" name="period" placeholder="tự nhận diện nếu bỏ trống" pattern="20\d\d"></label>
+        <label>Link gốc của tài liệu<input class="field" name="source_url" type="url" placeholder="https://…"></label>
+        <label class="full">Tài liệu (.pdf, .html, .txt)<input class="field" name="file" type="file" accept=".pdf,.html,.htm,.txt" required></label>
+        <div class="full"><button class="btn primary" id="docBtn">Trích xuất</button></div>
+      </form>
+    </section>
+  </div>
+
+  <section id="result"></section>
+
+  <h2 class="section">Lượt nộp gần đây</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>File</th><th>Loại</th><th>Trạng thái</th><th class="hide-sm">Đơn vị / chỉ tiêu</th><th>Kết quả</th><th class="hide-sm">Thời gian</th></tr></thead>
+      <tbody id="subs"></tbody>
+    </table>
+  </div>
+</main>
+<script>
+renderHeader("/upload");
+
+async function init() {
+  const [tpls, inds] = await Promise.all([api("/api/templates"), api("/api/indicators?framework=QD2244")]);
+  $("tpl").innerHTML = tpls.length ? `<a class="btn" href="${tpls[0].download_url}">⬇ ${esc(tpls[0].title)}</a>` : "Chưa sinh template";
+  $("docInd").innerHTML = inds.map((i) => `<option value="${esc(i.code)}" ${i.code === "0425" ? "selected" : ""}>${esc(i.code)} – ${esc(i.name)}</option>`).join("");
+  loadSubs();
+}
+
+function resultHtml(s) {
+  const sm = s.summary || {}, info = sm.info || {};
+  const head = `<h2 class="section">Kết quả lượt nộp #${s.id}: ${esc(s.file_name)} ${status(s.status)}</h2>`;
+  let body = "";
+  if (s.status === "validation_failed") {
+    const rows = new Set(s.errors.filter((e) => e.row).map((e) => e.sheet + ":" + e.row)).size;
+    body += `<div class="errbox">File <b>chưa được nhập</b>: ${s.errors.length} lỗi${rows ? ` ở ${rows} dòng` : ""}. Sửa trong file rồi nộp lại.</div>`;
+  } else if (s.kind === "template") {
+    body += `<div class="okbox">Đã nhập <b>${sm.rows}</b> dòng của <b>${esc(info.name || "")}</b> (chỉ tiêu ${esc((sm.indicators || []).join(", "))}, năm ${esc((sm.periods || []).join(", "))}): ${sm.new || 0} mới, ${sm.updated || 0} cập nhật, ${sm.unchanged || 0} không đổi. Số liệu ở trạng thái <b>chờ duyệt</b>. <a href="/review?submission_id=${s.id}">Mở hàng đợi duyệt →</a></div>`;
+  } else {
+    body += sm.candidates ? `<div class="okbox">Tìm thấy <b>${sm.candidates}</b> giá trị ứng viên cho chỉ tiêu ${esc(sm.indicator)}. <a href="/review?submission_id=${s.id}">Xem và duyệt →</a></div>` : "";
+  }
+  const issues = [...s.errors.map((e) => ({ ...e, level: "error" })), ...s.warnings.map((w) => ({ ...w, level: "warning" }))];
+  if (issues.length) body += `<div class="table-wrap"><table><thead><tr><th>Mức</th><th>Sheet</th><th>Dòng</th><th>Cột</th><th>Giá trị</th><th>Nội dung</th></tr></thead><tbody>${
+    issues.map((i) => `<tr><td>${i.level === "error" ? '<span class="status st-failed">Lỗi</span>' : '<span class="status st-needs_review">Cảnh báo</span>'}</td><td>${esc(i.sheet || "")}</td><td>${esc(i.row || "")}</td><td>${esc(i.column || "")}</td><td class="small">${esc(i.value || "")}</td><td>${esc(i.message)}</td></tr>`).join("")
+  }</tbody></table></div>`;
+  return head + body;
+}
+
+async function loadSubs() {
+  const subs = await api("/api/submissions?limit=30");
+  $("subs").innerHTML = subs.map((s) => {
+    const sm = s.summary || {};
+    const what = s.kind === "template" ? esc((sm.info || {}).name || "") : `Chỉ tiêu ${esc(sm.indicator || "")}`;
+    const res = s.status === "validation_failed" ? `<span class="err-text">${s.errors.length} lỗi</span>`
+      : s.kind === "template" ? `${sm.rows || 0} dòng` : `${sm.candidates || 0} ứng viên`;
+    return `<tr class="click" onclick="showSub(${s.id})"><td>${s.id}</td><td>${esc(s.file_name)}</td><td>${s.kind === "template" ? "Template" : "Doc-ETL"}</td><td>${status(s.status)}</td><td class="hide-sm">${what}</td><td>${res}${s.warnings.length ? ` · <span class="warn-text">${s.warnings.length} cảnh báo</span>` : ""}</td><td class="hide-sm small">${when(s.created_at)}</td></tr>`;
+  }).join("") || '<tr><td colspan="7" class="muted">Chưa có lượt nộp nào.</td></tr>';
+}
+
+async function showSub(id) { $("result").innerHTML = resultHtml(await api("/api/submissions/" + id)); $("result").scrollIntoView({ behavior: "smooth" }); }
+
+async function uploadXlsx(file) {
+  if (!file) return;
+  const fd = new FormData(); fd.append("file", file);
+  const n = reviewerName(); if (n) fd.append("submitted_by", n);
+  $("result").innerHTML = `<p class="muted">Đang kiểm tra ${esc(file.name)}…</p>`;
+  try { $("result").innerHTML = resultHtml(await api("/api/submissions", { method: "POST", body: fd })); }
+  catch (e) { $("result").innerHTML = `<div class="errbox">${esc(e.message)}</div>`; }
+  loadSubs();
+}
+
+$("xlsx").addEventListener("change", (e) => uploadXlsx(e.target.files[0]));
+const dz = $("dz");
+["dragenter", "dragover"].forEach((t) => dz.addEventListener(t, (e) => { e.preventDefault(); dz.classList.add("drag"); }));
+["dragleave", "drop"].forEach((t) => dz.addEventListener(t, (e) => { e.preventDefault(); dz.classList.remove("drag"); }));
+dz.addEventListener("drop", (e) => uploadXlsx(e.dataTransfer.files[0]));
+
+$("docForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  for (const k of ["period", "source_url"]) if (!fd.get(k)) fd.delete(k);
+  $("docBtn").disabled = true;
+  $("result").innerHTML = '<p class="muted">Đang đọc tài liệu…</p>';
+  try { $("result").innerHTML = resultHtml(await api("/api/documents", { method: "POST", body: fd })); }
+  catch (err) { $("result").innerHTML = `<div class="errbox">${esc(err.message)}</div>`; }
+  $("docBtn").disabled = false;
+  loadSubs();
+});
+
+init();
+</script>
+</body>
+</html>

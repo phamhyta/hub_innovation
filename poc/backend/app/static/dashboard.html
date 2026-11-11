@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Innovation Hub – Tổng quan</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/common.js"></script>
+<script src="/static/charts.js"></script>
+</head>
+<body>
+<main>
+  <div class="filters" style="justify-content:space-between">
+    <div class="muted small">Chỉ tiêu theo QĐ 2244/QĐ-TTg · chỉ hiển thị số liệu <b>đã công bố</b> · <span id="crawl"></span></div>
+    <div class="filters no-print" style="margin:0">
+      <select id="year" class="field"></select>
+      <a class="btn" id="xlsx">⬇ Xuất Excel</a>
+      <a class="btn primary" id="print">🖨 Báo cáo in / PDF</a>
+    </div>
+  </div>
+  <section class="stats" id="kpis"></section>
+
+  <h2 class="section">Độ phủ theo trụ cột</h2>
+  <div class="grid2" id="pillars" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))"></div>
+
+  <h2 class="section">Chỉ tiêu đã có số liệu</h2>
+  <div class="cards" id="cards"></div>
+
+  <h2 class="section">Chỉ số quốc tế của Việt Nam <span class="muted small">(với thứ hạng: số nhỏ = tốt, trục đã đảo chiều để "lên" là tốt hơn)</span></h2>
+  <div class="grid3" id="ranks"></div>
+
+  <h2 class="section">Ma trận chỉ tiêu × năm</h2>
+  <p class="muted small">Ô xanh: có giá trị tiêu biểu đã công bố · <span class="warn-text">◔ chờ duyệt</span>: có số liệu đang chờ duyệt · – chưa có.</p>
+  <div class="table-wrap"><table class="matrix" id="matrix"></table></div>
+
+  <h2 class="section">Theo cơ quan chủ trì (QĐ 2244)</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Cơ quan</th><th class="num">Được giao</th><th class="num">Đã công bố</th><th class="num">Có số liệu chờ duyệt</th><th style="width:30%">Tiến độ</th></tr></thead>
+      <tbody id="agencies"></tbody>
+    </table>
+  </div>
+</main>
+<script>
+renderHeader("/");
+
+function delta(h) {
+  if (h.change_pct == null) return '<span class="delta flat">— chưa có kỳ trước</span>';
+  const cls = h.improved ? "up" : (Math.abs(h.change_pct) < 0.05 ? "flat" : "down");
+  const icon = h.improved ? "▲ cải thiện" : (cls === "flat" ? "■ không đổi" : "▼ kém đi");
+  const val = h.lower_is_better ? `${h.latest.value - h.previous.value > 0 ? "+" : ""}${fmt(h.latest.value - h.previous.value)} bậc`
+    : `${h.change_pct > 0 ? "+" : ""}${h.change_pct.toFixed(1)}%`;
+  return `<span class="delta ${cls}">${icon} ${val} so với ${esc(h.previous.period)}</span>`;
+}
+
+async function init() {
+  const d = await api("/api/dashboard");
+  const k = d.kpis;
+  $("crawl").textContent = k.last_crawl_at ? `thu thập tự động gần nhất: ${when(k.last_crawl_at)}` : "chưa chạy thu thập tự động";
+  $("kpis").innerHTML = [
+    [`${k.with_published}/${k.indicators}`, "Chỉ tiêu có số liệu đã công bố"],
+    [`${k.with_any_data}/${k.indicators}`, "Chỉ tiêu đã có dữ liệu (kể cả chờ duyệt)"],
+    [k.indicators_pending_only, "Chỉ tiêu chỉ có số liệu chờ duyệt"],
+    [k.pending_points, "Điểm dữ liệu chờ duyệt"],
+  ].map(([v, l]) => `<div class="stat"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+
+  $("pillars").innerHTML = d.pillars.map((p) => `
+    <div class="card"><div style="display:flex;justify-content:space-between"><b>${esc(p.label)}</b><span class="small muted">${p.published}/${p.total} chỉ tiêu</span></div>
+      <div class="bar" style="margin:8px 0 6px" title="${p.published} đã công bố, ${p.pending_only} chỉ có số chờ duyệt">
+        <span class="b1" style="width:${p.published / p.total * 100}%"></span><span class="b2" style="width:${p.pending_only / p.total * 100}%"></span></div>
+      <div class="small muted"><span style="color:var(--series-1)">■</span> đã công bố ${p.published} · <span style="color:var(--seq-soft)">■</span> chỉ chờ duyệt ${p.pending_only}</div></div>`).join("");
+
+  $("cards").innerHTML = d.headlines.map((h, i) => `
+    <a class="hcard" href="/indicator?code=${encodeURIComponent(h.code)}">
+      <div class="small"><span class="code">${esc(h.code)}</span> · <span class="muted">${esc(h.pillar_label || "")}</span></div>
+      <div style="min-height:40px">${esc(h.name)}</div>
+      <div class="small muted">${esc(h.breakdown)}</div>
+      <div style="display:flex;justify-content:space-between;align-items:end;gap:8px;margin-top:6px">
+        <div><span class="big">${fmt(h.latest.value)}</span> <span class="small muted">${esc(h.unit || "")} · ${esc(h.latest.period)}</span><div>${delta(h)}</div></div>
+        <div id="spark${i}"></div>
+      </div>
+      ${h.target_value != null ? `<div class="small" style="margin-top:6px">Mục tiêu ${fmt(h.target_value)}${h.target_year ? " (" + h.target_year + ")" : ""}: <b>${h.progress_pct != null ? h.progress_pct.toFixed(0) + "%" : "–"}</b></div>` : ""}
+      <div class="small muted" style="margin-top:6px">${esc(h.latest.origin_label)} ${conf(h.latest.confidence)}</div>
+    </a>`).join("") || '<div class="muted">Chưa có chỉ tiêu nào có số liệu được công bố. Vào <a href="/review">Duyệt dữ liệu</a> để công bố.</div>';
+  d.headlines.forEach((h, i) => sparkline($("spark" + i), h.series.slice(-8).map((p) => ({ x: p.period, y: p.value })), { invert: h.lower_is_better }));
+
+  $("ranks").innerHTML = Object.entries(d.rankings).map(([name, r]) => `<a class="hcard" href="/indicator?code=${r.code}"><b>${esc(r.label)}</b> <span class="small muted">(${r.code})</span><div id="rk-${name}"></div></a>`).join("");
+  Object.entries(d.rankings).forEach(([name, r]) => lineChart($("rk-" + name), {
+    series: [{ name: r.label, points: r.series.map((p) => ({ x: p.period, y: p.value, unit: r.unit })) }],
+    invert: r.invert, height: 180, unit: r.unit }));
+
+  const years = d.matrix.years;
+  const PL = { input: "Đầu vào", output: "Kết quả", efficiency: "Hiệu quả", impact: "Tác động" };
+  let last = null, rows = "";
+  for (const r of d.matrix.rows) {
+    if (r.pillar !== last) { rows += `<tr class="pillar"><td colspan="${years.length + 1}">${esc(PL[r.pillar] || "")}</td></tr>`; last = r.pillar; }
+    rows += `<tr><td class="name"><a href="/indicator?code=${encodeURIComponent(r.code)}"><span class="code">${esc(r.code)}</span></a> <span class="small">${esc(r.name.slice(0, 70))}${r.name.length > 70 ? "…" : ""}</span></td>` +
+      years.map((y) => { const c = r.cells[y]; return !c ? '<td class="muted">–</td>' : c.pending ? '<td class="pend" title="Có số liệu chờ duyệt">◔</td>' : `<td class="has" title="${esc(r.breakdown)}: ${fmt(c.value)} ${esc(r.unit || "")}">${fmt(c.value, 2)}</td>`; }).join("") + "</tr>";
+  }
+  $("matrix").innerHTML = `<thead><tr><th>Chỉ tiêu</th>${years.map((y) => `<th>${y}</th>`).join("")}</tr></thead><tbody>${rows}</tbody>`;
+
+  $("agencies").innerHTML = d.agencies.map((a) => `<tr><td>${esc(a.agency)}</td><td class="num">${a.assigned}</td><td class="num">${a.published}</td><td class="num">${a.pending}</td>
+    <td><div class="bar"><span class="b1" style="width:${a.published / a.assigned * 100}%"></span></div></td></tr>`).join("");
+
+  const thisYear = new Date().getFullYear();
+  $("year").innerHTML = [0, 1, 2, 3].map((i) => `<option ${i === 1 ? "selected" : ""}>${thisYear - i}</option>`).join("");
+  const sync = () => { $("xlsx").href = `/api/reports/indicators.xlsx?year=${$("year").value}`; $("print").href = `/report?year=${$("year").value}`; };
+  $("year").addEventListener("change", sync); sync();
+}
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Innovation Hub – Chi tiết chỉ tiêu</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/common.js"></script>
+<script src="/static/charts.js"></script>
+</head>
+<body>
+<main>
+  <div class="small"><a href="/">← Tổng quan</a> · <a href="/registry">Registry</a></div>
+  <div id="head"></div>
+
+  <section class="card" style="margin-top:12px">
+    <div class="filters">
+      <label class="small muted">Chuỗi chính <select id="s1" class="field"></select></label>
+      <label class="small muted">So sánh với <select id="s2" class="field"><option value="">— không —</option></select></label>
+      <label class="small muted">Địa bàn <select id="geo" class="field"></select></label>
+    </div>
+    <div id="chart"></div>
+    <p class="small muted" id="chartNote"></p>
+  </section>
+
+  <h2 class="section">Bảng số liệu</h2>
+  <div class="table-wrap"><table id="table"></table></div>
+  <p class="small muted">● đã công bố · ◔ chờ duyệt (chưa dùng cho dashboard/báo cáo) · ↓ file minh chứng nguồn</p>
+</main>
+<script>
+renderHeader("");
+const code = new URLSearchParams(location.search).get("code") || "0428";
+let data = null;
+
+async function load(geo) {
+  const [ind, d] = await Promise.all([api("/api/indicators/" + encodeURIComponent(code)),
+    api(`/api/indicators/${encodeURIComponent(code)}/series?geography=${encodeURIComponent(geo || "Toàn quốc")}`)]);
+  data = d;
+  const h = d.headline;
+  document.title = `${code} – ${ind.name}`;
+  $("head").innerHTML = `
+    <div class="code" style="margin-top:10px">${esc(code)}</div><h2 style="margin:2px 0 6px">${esc(ind.name)}</h2>
+    <div>${conf(ind.confidence)} <span class="tag">${esc(ind.mvp_priority || "")}</span> ${ind.lead_agencies.map((a) => `<span class="tag">Chủ trì: ${esc(a)}</span>`).join("")}</div>
+    ${ind.aliases.map((a) => `<div class="warnbox">⚠ ${esc(a.note)}</div>`).join("")}
+    <section class="stats" style="margin-top:12px">
+      <div class="stat"><div class="v">${h ? fmt(h.latest.value) : "–"} <span class="small muted">${esc(h ? h.unit || "" : "")}</span></div><div class="l">${h ? `${esc(h.breakdown)} · ${esc(h.latest.period)}` : "Chưa có số liệu đã công bố"}</div></div>
+      <div class="stat"><div class="v">${!h || h.change_pct == null ? "–" : h.lower_is_better
+          ? (() => { const d = h.previous.value - h.latest.value; return d === 0 ? "giữ hạng" : `${d > 0 ? "▲ tăng" : "▼ giảm"} ${Math.abs(d)} bậc`; })()
+          : (h.change_pct > 0 ? "+" : "") + h.change_pct.toFixed(1) + "%"}</div><div class="l">So với ${h && h.previous ? esc(h.previous.period) : "kỳ trước"}${h && h.previous ? ` (${fmt(h.previous.value)})` : ""}</div></div>
+      <div class="stat"><div class="v">${ind.target_value != null ? fmt(ind.target_value) : "–"}</div><div class="l">Mục tiêu${ind.target_year ? " " + ind.target_year : ""}${h && h.progress_pct != null ? ` · đạt ${h.progress_pct.toFixed(0)}%` : " · <a href='/registry'>đặt mục tiêu</a>"}</div></div>
+      <div class="stat"><div class="v">${d.series.length}</div><div class="l">Chuỗi số liệu (phân tổ × nguồn)</div></div>
+    </section>`;
+  $("geo").innerHTML = d.geographies.map((g) => `<option ${g === (geo || "Toàn quốc") ? "selected" : ""}>${esc(g)}</option>`).join("") || "<option>Toàn quốc</option>";
+  const opts = d.series.map((s, i) => `<option value="${i}">${esc(s.breakdown)} — ${esc(s.origin_label)}${s.derived ? " (tự tính)" : ""}</option>`).join("");
+  $("s1").innerHTML = opts;
+  $("s2").innerHTML = '<option value="">— không —</option>' + opts;
+  const hi = d.series.findIndex((s) => s.breakdown === d.headline_breakdown && s.points.some((p) => p.status === "published"));
+  $("s1").value = String(Math.max(0, hi));
+  draw();
+  table();
+}
+
+function draw() {
+  if (!data.series.length) { $("chart").innerHTML = '<div class="muted">Chưa có số liệu.</div>'; return; }
+  const pick = [$("s1").value, $("s2").value].filter((v) => v !== "").map(Number).filter((v, i, a) => a.indexOf(v) === i);
+  const chosen = pick.map((i) => data.series[i]);
+  const units = [...new Set(chosen.map((s) => s.unit))];
+  if (units.length > 1) {   // không vẽ 2 đơn vị khác nhau trên một trục
+    $("chartNote").textContent = `Không so sánh được trên cùng trục: "${units.join('" và "')}" khác đơn vị. Chỉ vẽ chuỗi chính.`;
+    chosen.splice(1);
+  } else $("chartNote").textContent = "Chỉ vẽ số liệu đã công bố; số chờ duyệt xem trong bảng.";
+  lineChart($("chart"), {
+    series: chosen.map((s) => ({ name: `${s.breakdown} (${s.origin_label})`, points: s.points.filter((p) => p.status === "published").map((p) => ({ x: p.period, y: p.value, unit: s.unit })) })),
+    invert: chosen[0].lower_is_better, unit: chosen[0].unit,
+    target: chosen[0].breakdown === data.headline_breakdown ? data.target_value : null, height: 260 });
+}
+
+function table() {
+  const periods = [...new Set(data.series.flatMap((s) => s.points.map((p) => p.period)))].sort().reverse().slice(0, 12);
+  $("table").innerHTML = `<thead><tr><th>Phân tổ</th><th>Nguồn</th><th>Đơn vị</th>${periods.map((p) => `<th class="num">${p}</th>`).join("")}</tr></thead><tbody>` +
+    data.series.map((s) => `<tr><td>${esc(s.breakdown)}${s.derived ? ' <span class="tag">tự tính</span>' : ""}</td><td class="small">${esc(s.origin_label)} ${conf(s.confidence)}</td><td class="small">${esc(s.unit || "")}</td>` +
+      periods.map((per) => {
+        const p = s.points.find((q) => q.period === per);
+        if (!p) return '<td class="num muted">–</td>';
+        const mark = p.status === "published" ? "●" : '<span class="warn-text">◔</span>';
+        const ev = p.evidence_file_id ? ` <a href="/api/evidence/${p.evidence_file_id}" title="Minh chứng">↓</a>` : "";
+        return `<td class="num" title="${esc(p.excerpt || "")}">${mark} ${fmt(p.value)}${ev}</td>`;
+      }).join("") + "</tr>").join("") + "</tbody>";
+}
+
+$("s1").addEventListener("change", draw);
+$("s2").addEventListener("change", draw);
+$("geo").addEventListener("change", () => load($("geo").value));
+window.addEventListener("resize", () => data && draw());
+load();
+</script>
+</body>
+</html>

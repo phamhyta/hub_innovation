@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Innovation Hub – Thu thập tự động</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/common.js"></script>
+</head>
+<body>
+<main>
+  <div class="filters" style="justify-content:space-between">
+    <div class="muted">Mỗi connector chỉ chạy trên nguồn đã duyệt. Nguồn tin cậy <b>A</b> được công bố tự động; còn lại vào hàng đợi duyệt. Mỗi lần chạy đều lưu snapshot nguồn làm minh chứng.</div>
+    <button class="btn primary" id="runAll">▶ Chạy tất cả</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Connector</th><th>Chỉ tiêu</th><th>Tin cậy</th><th>Lần chạy gần nhất</th><th>Kết quả</th><th></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <h2 class="section">Lịch sử chạy</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Connector</th><th>Kích hoạt</th><th>Trạng thái</th><th>Thống kê</th><th class="hide-sm">Bắt đầu</th><th class="hide-sm">Thời gian</th></tr></thead>
+      <tbody id="runs"></tbody>
+    </table>
+  </div>
+</main>
+<script>
+renderHeader("/connectors");
+const STAT_LABEL = { documents: "tài liệu", new: "mới", updated: "thay đổi", unchanged: "không đổi", published: "công bố", needs_review: "chờ duyệt", skipped: "bỏ qua", derived_computed: "chỉ số tính" };
+const statsText = (s) => Object.entries(s || {}).filter(([, v]) => v).map(([k, v]) => `${v} ${STAT_LABEL[k] || k}`).join(" · ");
+const dur = (r) => r.finished_at ? ((new Date(r.finished_at + (r.finished_at.endsWith("Z") ? "" : "Z")) - new Date(r.started_at + (r.started_at.endsWith("Z") ? "" : "Z"))) / 1000).toFixed(1) + " s" : "";
+
+async function load() {
+  const [cs, runs] = await Promise.all([api("/api/connectors"), api("/api/crawl-runs?limit=40")]);
+  $("rows").innerHTML = cs.map((c) => {
+    const r = c.last_run;
+    return `<tr>
+      <td><b>${esc(c.title)}</b> <span class="tag">${esc(c.name)}</span><div class="excerpt">${esc(c.description)}</div><a class="small" href="${esc(c.home_url)}" target="_blank" rel="noopener">nguồn ↗</a></td>
+      <td>${c.indicators.map((i) => `<span class="code">${esc(i)}</span>`).join(" ")}</td>
+      <td>${conf(c.confidence)}<div class="small muted">${c.auto_publish ? "tự công bố" : "cần duyệt"}</div></td>
+      <td>${r ? status(r.status) + `<div class="small muted">${when(r.started_at)}</div>` : '<span class="muted">chưa chạy</span>'}</td>
+      <td class="small">${r ? (r.error ? `<span class="err-text">${esc(r.error)}</span>` : esc(statsText(r.stats))) : ""}
+        ${r && r.stats && r.stats.needs_review ? `<div><a href="/review?crawl_run_id=${r.id}&geography=*">Duyệt ${r.stats.needs_review} điểm →</a></div>` : ""}</td>
+      <td><button class="btn sm" data-run="${esc(c.name)}">▶ Chạy</button></td>
+    </tr>`;
+  }).join("");
+  $("runs").innerHTML = runs.map((r) => `<tr><td>${r.id}</td><td>${esc(r.connector)}</td><td>${esc(r.trigger)}</td><td>${status(r.status)}</td>
+    <td class="small">${r.error ? `<span class="err-text">${esc(r.error)}</span>` : esc(statsText(r.stats))}</td><td class="hide-sm small">${when(r.started_at)}</td><td class="hide-sm small">${dur(r)}</td></tr>`).join("")
+    || '<tr><td colspan="7" class="muted">Chưa có lần chạy nào.</td></tr>';
+  document.querySelectorAll("[data-run]").forEach((b) => b.onclick = () => run(b.dataset.run, b));
+}
+
+async function run(name, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = "Đang chạy…"; }
+  try {
+    const r = await api(`/api/connectors/${encodeURIComponent(name)}/run`, { method: "POST" });
+    toast(`${name}: ${STATUS[r.status]} – ${r.error || statsText(r.stats)}`);
+  } catch (e) { toast(`${name}: ${e.message}`); }
+  await load();
+}
+
+$("runAll").onclick = async () => {
+  $("runAll").disabled = true;
+  const cs = await api("/api/connectors");
+  for (const c of cs) { toast(`Đang chạy ${c.title}…`, 60000); await run(c.name, document.querySelector(`[data-run="${c.name}"]`)); }
+  $("runAll").disabled = false;
+};
+
+load();
+</script>
+</body>
+</html>

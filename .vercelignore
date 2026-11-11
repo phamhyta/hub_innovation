@@ -1,0 +1,8 @@
+**/.venv
+**/__pycache__
+**/.pytest_cache
+poc/backend/tests
+poc/backend/innovation_hub.db
+poc/data/storage
+poc/docs
+*.md

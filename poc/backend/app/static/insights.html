@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Innovation Hub – Đề xuất tiêu chí</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/common.js"></script>
+<script src="/static/charts.js"></script>
+<style>
+  .sg { display: grid; grid-template-columns: 1fr 200px; gap: 14px; }
+  .sg .side { border-left: 1px solid var(--line); padding-left: 14px; }
+  .sg h3 { margin: 2px 0 6px; font-size: 15px; }
+  .sg .k { color: var(--muted); font-size: 12px; }
+  .meter { display: grid; grid-template-columns: 70px 1fr 34px; gap: 6px; align-items: center; font-size: 12px; margin: 3px 0; }
+  .card.accepted { border-color: var(--ok); } .card.rejected { opacity: .65; }
+  @media (max-width: 760px) { .sg { grid-template-columns: 1fr; } .sg .side { border-left: 0; padding-left: 0; } }
+</style>
+</head>
+<body>
+<main>
+  <p class="muted">Hệ thống thu thập dữ liệu <b>ngoài</b> bộ chỉ tiêu được giao (công bố, nhà khoa học, tổ chức, sáng chế, doanh nghiệp, tuyển dụng), so với registry hiện có để tìm <b>khoảng trống</b>, rồi đề xuất tiêu chí mới kèm số liệu tính thử. Chuyên gia quyết định chấp nhận hay không.</p>
+  <div class="filters">
+    <label class="small muted">Chuyên gia duyệt <input id="reviewer" class="field" style="width:180px" placeholder="Họ tên"></label>
+    <span class="spacer" style="flex:1"></span>
+    <button class="btn" id="regen">↻ Tạo lại đề xuất từ dữ liệu hiện có</button>
+  </div>
+  <section class="stats" id="kpis"></section>
+  <div id="list"></div>
+
+  <h2 class="section">Nguồn dữ liệu ngoài</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Bộ thu thập</th><th>Lần chạy gần nhất</th><th>Kết quả</th><th></th></tr></thead>
+    <tbody id="cols"></tbody></table></div>
+
+  <h2 class="section">Tổ chức nghiên cứu tại Việt Nam (OpenAlex)</h2>
+  <div class="filters" id="types"></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>#</th><th>Tổ chức</th><th>Loại</th><th class="num">Công bố</th><th class="num">Trích dẫn</th></tr></thead>
+    <tbody id="inst"></tbody></table></div>
+</main>
+<script>
+renderHeader("/insights");
+const PL = { input: "Đầu vào", output: "Kết quả", efficiency: "Hiệu quả", impact: "Tác động" };
+const TYPE = { education: "Giáo dục", facility: "Viện/cơ sở NC", healthcare: "Y tế", government: "Nhà nước", nonprofit: "Phi lợi nhuận", company: "Doanh nghiệp", other: "Khác", archive: "Lưu trữ", funder: "Quỹ" };
+const STAT = { proposed: ["st-needs_review", "Chờ chuyên gia"], accepted: ["st-published", "Đã chấp nhận"], rejected: ["st-rejected", "Đã từ chối"] };
+let instType = "";
+
+const meter = (label, v) => `<div class="meter"><span class="muted">${label}</span><div class="bar"><span class="b1" style="width:${(v || 0) * 100}%"></span></div><b>${Math.round((v || 0) * 100)}</b></div>`;
+
+async function load() {
+  const items = await api("/api/suggestions");
+  const n = (s) => items.filter((i) => i.status === s).length;
+  $("kpis").innerHTML = [[items.length, "Đề xuất"], [n("proposed"), "Chờ chuyên gia"], [n("accepted"), "Đã đưa vào registry"], [items.filter((i) => i.warnings && i.warnings.some((w) => w.startsWith("Có thể trùng"))).length, "Có thể trùng chỉ tiêu cũ"]]
+    .map(([v, l]) => `<div class="stat"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+  $("list").innerHTML = items.map((s, i) => {
+    const vals = Object.entries(s.values || {}), last = vals[vals.length - 1], st = STAT[s.status];
+    return `<section class="card ${s.status}" style="margin-bottom:12px"><div class="sg"><div>
+      <div><span class="status ${st[0]}">${st[1]}</span> <span class="tag">${esc(PL[s.pillar] || "")}</span> ${conf(s.expected_confidence)} <span class="tag">${esc(s.frequency || "")}</span>${s.synthetic ? ' <span class="tag">dữ liệu giả lập</span>' : ""}</div>
+      <h3>${esc(s.name)}</h3>
+      <div class="small">${esc(s.definition)}</div>
+      <div class="small" style="margin-top:4px"><span class="k">Công thức:</span> ${esc(s.formula)}</div>
+      <div class="small"><span class="k">Nguồn:</span> ${s.data_sources.map(esc).join("; ")}</div>
+      <div class="small" style="margin-top:6px"><span class="k">Vì sao đề xuất:</span> ${esc(s.rationale)}</div>
+      ${s.closest ? `<div class="small"><span class="k">Chỉ tiêu gần nhất trong registry:</span> <a href="/indicator?code=${encodeURIComponent(s.closest.code)}">${esc(s.closest.code)}</a> – ${esc(s.closest.name)} (${Math.round(s.closest.similarity * 100)}%)</div>` : ""}
+      ${(s.warnings || []).map((w) => `<div class="warnbox">⚠ ${esc(w)}</div>`).join("")}
+      ${s.reviewer_note ? `<div class="small muted">Ý kiến: ${esc(s.reviewer_note)}</div>` : ""}
+      ${s.status === "proposed" ? `<div style="margin-top:8px"><button class="btn ok sm" onclick="act(${s.id},'accept')">✓ Chấp nhận – đưa vào registry</button> <button class="btn danger sm" onclick="act(${s.id},'reject')">✕ Từ chối</button></div>`
+        : s.accepted_code ? `<div style="margin-top:8px"><a class="btn sm" href="/indicator?code=${encodeURIComponent(s.accepted_code)}">Xem chỉ tiêu ${esc(s.accepted_code)} →</a></div>` : ""}
+    </div><div class="side">
+      <div class="k">Tính thử (${vals.length} kỳ)</div>
+      <div style="font-size:20px;font-weight:600">${last ? fmt(last[1], 2) : "–"} <span class="small muted">${esc(s.unit)}${last ? " · " + esc(last[0]) : ""}</span></div>
+      <div id="sp${i}"></div>
+      <div style="margin-top:8px">${meter("Độ mới", s.novelty)}${meter("Khả thi", s.feasibility)}${meter("Ưu tiên", s.priority)}</div>
+    </div></div></section>`;
+  }).join("") || '<div class="muted">Chưa có đề xuất. Chạy các bộ thu thập bên dưới rồi bấm "Tạo lại đề xuất".</div>';
+  items.forEach((s, i) => sparkline($("sp" + i), Object.entries(s.values || {}).slice(-10).map(([x, y]) => ({ x, y }))));
+}
+
+async function loadCols() {
+  const cs = await api("/api/external/collectors");
+  $("cols").innerHTML = cs.map((c) => { const r = c.last_run; return `<tr><td><b>${esc(c.title)}</b>${c.synthetic ? ' <span class="tag">giả lập</span>' : ""}<div class="excerpt">${esc(c.description)}</div></td>
+    <td>${r ? status(r.status) + `<div class="small muted">${when(r.started_at)}</div>` : '<span class="muted">chưa chạy</span>'}</td>
+    <td class="small">${r ? (r.error ? `<span class="err-text">${esc(r.error)}</span>` : Object.entries(r.stats).filter(([, v]) => v).map(([k, v]) => `${v} ${k}`).join(" · ")) : ""}</td>
+    <td><button class="btn sm" data-c="${esc(c.name)}">▶ Chạy</button></td></tr>`; }).join("");
+  document.querySelectorAll("[data-c]").forEach((b) => b.onclick = async () => {
+    b.disabled = true; b.textContent = "Đang chạy…";
+    try { const r = await api(`/api/external/collectors/${b.dataset.c}/run`, { method: "POST" }); toast(`${b.dataset.c}: ${STATUS[r.status]}${r.error ? " – " + r.error : ""}`); } catch (e) { toast(e.message); }
+    loadCols(); loadInst();
+  });
+}
+
+async function loadInst() {
+  const d = await api(`/api/external/institutions?limit=15${instType ? "&type=" + instType : ""}`);
+  $("types").innerHTML = `<button class="btn sm ${instType ? "" : "primary"}" data-t="">Tất cả</button> ` + Object.entries(d.types).sort((a, b) => b[1] - a[1]).map(([t, n]) => `<button class="btn sm ${instType === t ? "primary" : ""}" data-t="${esc(t)}">${esc(TYPE[t] || t)} (${n})</button>`).join(" ");
+  document.querySelectorAll("[data-t]").forEach((b) => b.onclick = () => { instType = b.dataset.t; loadInst(); });
+  $("inst").innerHTML = d.items.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.name)}</td><td>${esc(TYPE[r.type] || r.type || "")}</td><td class="num">${fmt(r.works_count)}</td><td class="num">${fmt(r.cited_by_count)}</td></tr>`).join("") || '<tr><td colspan="5" class="muted">Chưa có dữ liệu – chạy bộ thu thập "tổ chức nghiên cứu".</td></tr>';
+}
+
+async function act(id, action) {
+  const reviewer = $("reviewer").value.trim();
+  if (!reviewer) { toast("Nhập tên chuyên gia duyệt trước"); $("reviewer").focus(); return; }
+  setReviewerName(reviewer);
+  let note = null;
+  if (action === "reject") { note = prompt("Lý do từ chối đề xuất:"); if (!note) return; }
+  else note = prompt("Ghi chú khi chấp nhận (không bắt buộc):") || null;
+  try { const r = await api(`/api/suggestions/${id}/review`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, reviewer, note }) });
+    toast(action === "accept" ? `Đã thêm ${r.accepted_code} vào registry – số liệu tính thử đang chờ duyệt` : "Đã từ chối đề xuất"); }
+  catch (e) { toast("Lỗi: " + e.message); }
+  load(); refreshBadge();
+}
+
+$("regen").onclick = async () => { const r = await api("/api/suggestions/generate", { method: "POST" }); toast(`Tạo mới ${r.created}, cập nhật ${r.updated}, bỏ qua (thiếu dữ liệu) ${r.skipped_no_data}`); load(); };
+$("reviewer").value = reviewerName();
+$("reviewer").addEventListener("change", () => setReviewerName($("reviewer").value.trim()));
+load(); loadCols(); loadInst();
+</script>
+</body>
+</html>
