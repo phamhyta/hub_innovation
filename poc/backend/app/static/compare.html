@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>So sánh chỉ tiêu – Dữ liệu Đổi mới sáng tạo</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/common.js"></script>
+<script src="/static/illus.js"></script>
+<script src="/static/charts.js"></script>
+<style>
+  .ctl { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-bottom: 12px; }
+  .ctl .lab { font-size: 12.5px; color: var(--text-3); margin-right: 6px; }
+  .picker { display: flex; gap: 8px; align-items: center; min-width: 0; max-width: 100%; }
+  .picker select { min-width: 0; width: 460px; max-width: 100%; flex: 1 1 auto; }
+  @media (max-width: 600px) { .picker { width: 100%; } .picker select { width: auto; } }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .chip-x { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 6px 0 10px; border-radius: 999px; background: var(--primary-soft); color: var(--primary); font-size: 13px; font-weight: 600; }
+  .chip-x button { border: 0; background: none; cursor: pointer; color: inherit; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; }
+  .chip-x button:hover { background: #fff; }
+  .mult { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .mult .card h3 { margin: 0; font-size: 14.5px; line-height: 1.35; }
+  .mult .card .sub { font-size: 12.5px; color: var(--text-3); margin: 4px 0 6px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  @media (max-width: 900px) { .mult { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="ctl">
+    <div class="picker"><select class="field" id="pick" aria-label="Chọn chỉ tiêu"></select><button class="btn" id="add"></button></div>
+    <span><span class="lab">Kỳ</span><span id="resWrap"></span></span>
+    <span><span class="lab">Cửa sổ</span><span id="winWrap"></span></span>
+  </div>
+  <div class="chips" id="chips"></div>
+  <div class="mult" id="mult"></div>
+  <p class="small muted">Mỗi chỉ tiêu một trục riêng, không dùng chung trục để tránh so sánh sai đơn vị. Chỉ tiêu không có số liệu ở kỳ đã chọn thì dùng kỳ gần nhất có số liệu.</p>
+</main>
+<script>
+renderHeader("/compare");
+const q = new URLSearchParams(location.search);
+const state = { codes: (q.get("codes") || "0202,137-M01,0209,137-M03").split(",").filter(Boolean).slice(0, 4), res: q.get("res") || "Q", window: +(q.get("window") || 8) };
+$("add").innerHTML = ic("check") + "Thêm";
+$("resWrap").innerHTML = segHtml("res", [["M", "Tháng"], ["Q", "Quý"], ["Y", "Năm"]], state.res, "Kỳ");
+$("winWrap").innerHTML = segHtml("win", [[4, "4 kỳ"], [8, "8 kỳ"], [12, "12 kỳ"]], state.window, "Cửa sổ");
+onSeg("res", (v) => { state.res = v; render(); });
+onSeg("win", (v) => { state.window = +v; render(); });
+
+async function init() {
+  const [a, b] = await Promise.all([api("/api/sets/2244/indicators?window=2"), api("/api/sets/137/indicators?window=2")]);
+  const opt = (x) => `<option value="${esc(x.code)}">${esc(x.code)} – ${esc(x.name.length > 70 ? x.name.slice(0, 70) + "…" : x.name)}</option>`;
+  $("pick").innerHTML = `<optgroup label="QĐ 2244">${a.items.map(opt).join("")}</optgroup><optgroup label="Bộ 137 (mẫu)">${b.items.map(opt).join("")}</optgroup>`;
+  $("add").onclick = () => {
+    const c = $("pick").value;
+    if (state.codes.includes(c)) return toast("Chỉ tiêu đã có trong danh sách");
+    if (state.codes.length >= 4) return toast("Tối đa 4 chỉ tiêu", { type: "err" });
+    state.codes.push(c); render();
+  };
+  render();
+}
+
+async function render() {
+  history.replaceState(null, "", `?codes=${state.codes.join(",")}&res=${state.res}&window=${state.window}`);
+  $("chips").innerHTML = state.codes.map((c) => `<span class="chip-x">${esc(c)}<button type="button" data-c="${esc(c)}" aria-label="Bỏ ${esc(c)}">${ic("x")}</button></span>`).join("");
+  $("chips").querySelectorAll("button").forEach((b) => b.onclick = () => { state.codes = state.codes.filter((c) => c !== b.dataset.c); render(); });
+  if (!state.codes.length) { $("mult").innerHTML = emptyState("Chọn 2–4 chỉ tiêu để so sánh", "chart"); return; }
+  const list = await Promise.all(state.codes.map((c) => api(`/api/indicators/${encodeURIComponent(c)}/timeseries?res=${state.res}&window=${state.window}`).catch(() => null)));
+  $("mult").innerHTML = list.map((t, i) => !t ? "" : `<section class="card"><h3><a href="/indicator?code=${encodeURIComponent(t.code)}"><span class="code">${esc(t.code)}</span></a> ${esc(t.name)}</h3>
+    <div class="sub">${t.res ? `${RES_NAME[t.res]}${t.res !== state.res ? " (không có số " + RES_NAME[state.res].toLowerCase() + ")" : ""}` : "Chưa có số liệu"} · ${esc(t.unit || "")}
+      ${t.changes.pop != null ? `· ${t.pop_label} ${pctTag(t.changes.pop)}` : ""} ${t.changes.yoy != null && t.res !== "Y" ? `· YoY ${pctTag(t.changes.yoy)}` : ""} ${t.simulated ? simBadge() : ""}</div>
+    <div id="mc${i}"></div></section>`).join("");
+  list.forEach((t, i) => t && lineChart($("mc" + i), { series: [{ name: t.code, dashed: t.simulated, points: t.points.map((p) => ({ x: p.period, y: p.value, unit: t.unit })) }],
+    unit: t.unit, periodLabel: (RES_NAME[t.res] || "").toLowerCase(), height: 190 }));
+}
+init().catch((e) => toast("Không tải được dữ liệu: " + e.message, { type: "err" }));
+</script>
+</body>
+</html>

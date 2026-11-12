@@ -5,6 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.audit import record
+from app.auth import User, require_admin
+from app.seed_import import VALID_STATUS
 from app.db import get_session
 from app.models import (
     AssignmentRole,
@@ -65,6 +68,10 @@ def _summary_fields(ind: Indicator) -> dict:
         lead_agencies=leads,
         alias_codes=[a.alias_code for a in ind.aliases],
         source_count=len(ind.sources),
+        indicator_set=ind.indicator_set,
+        name_en=ind.name_en,
+        data_status=ind.data_status,
+        visibility=ind.visibility or "public",
     )
 
 
@@ -135,6 +142,8 @@ def stats(session: Session = Depends(get_session)):
         "by_collection_type": dict(by_ct),
         "with_definition": sum(1 for i in inds if i.definition),
         "aliases": sum(len(i.aliases) for i in inds),
+        "by_set": dict(Counter(i.indicator_set or i.primary_framework.value for i in inds)),
+        "by_data_status": dict(Counter(i.data_status for i in inds if i.data_status)),
     }
 
 
@@ -155,9 +164,19 @@ def get_indicator(code: str, session: Session = Depends(get_session)):
 
 
 @router.patch("/{code}", response_model=IndicatorDetail)
-def update_indicator(code: str, body: IndicatorUpdate, session: Session = Depends(get_session)):
+def update_indicator(code: str, body: IndicatorUpdate, session: Session = Depends(get_session),
+                     user: User = Depends(require_admin)):
     ind = _get(session, code)
-    for field, value in body.model_dump(exclude_unset=True).items():
+    changes = body.model_dump(exclude_unset=True)
+    reason = (changes.pop("reason", None) or "").strip() or None
+    if "data_status" in changes and changes["data_status"] not in VALID_STATUS:
+        raise HTTPException(422, f"Trạng thái dữ liệu không hợp lệ: {changes['data_status']}")
+    if changes.get("visibility") is None:
+        changes.pop("visibility", None)
+    diff = {f: {"from": getattr(ind, f), "to": v} for f, v in changes.items() if getattr(ind, f) != v}
+    for field, value in changes.items():
         setattr(ind, field, value)
+    if diff:
+        record(session, user, "indicator.update", target=ind.code, indicator_code=ind.code, detail=diff, reason=reason)
     session.commit()
     return _detail(_get(session, ind.code))

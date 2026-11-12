@@ -6,6 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.auth import COOKIE, demo_user, sign
 from app.config import POC_DIR, settings
 from app.connectors.base import Fetched
 from app.db import Base, get_session
@@ -17,6 +18,14 @@ SAMPLES = POC_DIR / "sample_data"
 VALID_NATIONAL = SAMPLES / "TPL-0101-0102_CucThongTinThongKe_2023-2025_GIA_LAP.xlsx"
 VALID_HANOI = SAMPLES / "TPL-0101-0102_SoKHCN_HaNoi_2025_GIA_LAP.xlsx"
 WITH_ERRORS = SAMPLES / "TPL-0101-0102_DonViX_2025_CO_LOI.xlsx"
+
+
+def login_as(c: TestClient, role: str) -> TestClient:
+    """Đặt cookie phiên của vai trò (public = không đăng nhập). Test cũ chạy với vai trò admin."""
+    c.cookies.clear()
+    if role != "public":
+        c.cookies.set(COOKIE, sign(demo_user(role)))
+    return c
 
 
 def fx(name: str, **meta) -> Fetched:
@@ -39,6 +48,8 @@ FIXTURE_DOCS = {
 @pytest.fixture(autouse=True)
 def _tmp_storage(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "storage_dir", tmp_path / "storage")
+    # Test dùng CSDL trong bộ nhớ; không khởi tạo/kiểm tra CSDL dev khi TestClient chạy lifespan
+    monkeypatch.setattr("app.main.init_db", lambda: None)
 
 
 @pytest.fixture()
@@ -61,5 +72,23 @@ def client(loaded):
     session, _ = loaded
     app.dependency_overrides[get_session] = lambda: session
     with TestClient(app) as c:
-        yield c
+        yield login_as(c, "admin")
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture()
+def seeded(loaded):
+    from app.seed_import import import_seed
+
+    session, _ = loaded
+    report = import_seed(session, settings.seed_path, imported_by="test")
+    return session, report
+
+
+@pytest.fixture()
+def seeded_client(seeded):
+    session, _ = seeded
+    app.dependency_overrides[get_session] = lambda: session
+    with TestClient(app) as c:
+        yield login_as(c, "admin")
     app.dependency_overrides.clear()

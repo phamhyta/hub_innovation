@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quản trị – Dữ liệu Đổi mới sáng tạo</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/common.js"></script>
+<script src="/static/illus.js"></script>
+<style>
+  .sum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+  .sum a.stat:hover { text-decoration: none; box-shadow: var(--shadow-lg); }
+  .sum .stat .v { font-size: 26px; }
+  @media (max-width: 900px) { .sum { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .ctl { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin: 14px 0 12px; }
+  .ctl .grow { flex: 1; }
+  .ctl input.field { min-width: 220px; }
+  @media (max-width: 600px) { .ctl input.field { min-width: 0; width: 100%; } }
+  .at td { vertical-align: middle; }
+  .vis { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; }
+  .vis.internal { color: var(--warn); }
+  .vis.public { color: var(--ok); }
+  .acts2 { display: flex; gap: 6px; justify-content: flex-end; }
+  .find { display: grid; gap: 8px; }
+  .find .fc { display: grid; gap: 8px; min-width: 0; }
+  .find > * { min-width: 0; }
+  .find .fc .top { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .find .fc .top input.field { flex: 1 1 180px; }
+  .find .fc .top input.field { flex: 1; min-width: 0; font-weight: 600; }
+  .find .fc textarea { width: 100%; min-height: 86px; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: 10px; resize: vertical; }
+  .find .fc label.pub { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--text-2); white-space: nowrap; }
+  .tab[hidden] { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <section class="sum" id="sum"></section>
+  <div id="tabsWrap"></div>
+
+  <section class="tab" id="t-ind">
+    <div class="ctl"><span id="setWrap"></span><input class="field" id="q" type="search" placeholder="Tìm mã hoặc tên" aria-label="Tìm chỉ tiêu"><span class="grow"></span><span class="small muted" id="indNote"></span></div>
+    <div class="table-wrap"><table class="at"><thead><tr><th style="width:90px">Mã</th><th>Chỉ tiêu</th><th style="width:130px">Hiển thị</th><th class="hide-sm" style="width:200px">Trạng thái dữ liệu</th><th style="width:90px"></th></tr></thead><tbody id="indRows"></tbody></table></div>
+    <p class="small muted">Chỉ tiêu <b>nội bộ</b> và mọi số liệu của nó bị ẩn với người xem không đăng nhập, ở tất cả trang và API. Mỗi thay đổi được ghi vào Nhật ký.</p>
+  </section>
+
+  <section class="tab" id="t-map" hidden>
+    <div class="ctl"><span class="small muted">Số liệu chỉ tiêu 2244 được tính lại từ bộ 137 theo các cặp dưới đây, rồi so với số của Cục.</span><span class="grow"></span><button class="btn primary" id="addMap"></button></div>
+    <div class="table-wrap"><table class="at"><thead><tr><th>Chỉ tiêu 2244</th><th>Chỉ tiêu 137</th><th class="hide-sm">Quan hệ</th><th class="hide-sm">Quy tắc gộp</th><th class="hide-sm">Ghi chú</th><th style="width:110px"></th></tr></thead><tbody id="mapRows"></tbody></table></div>
+  </section>
+
+  <section class="tab" id="t-find" hidden>
+    <div class="ctl"><span class="small muted">Các đoạn "Phát hiện chính" hiển thị trên trang Tổng quan.</span><span class="grow"></span><button class="btn" id="addFind"></button><button class="btn primary" id="saveFind"></button></div>
+    <div class="find" id="finds"></div>
+  </section>
+</main>
+<script>
+renderHeader("/admin");
+const REL = { identical: "Trùng hoàn toàn", component: "Thành phần", proxy: "Chỉ tiêu thay thế" };
+let inds = [], set = "2244", maps = [], finds = [];
+const PATCH = (url, body, method = "PATCH") => api(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+$("tabsWrap").innerHTML = segHtml("tab", [["ind", "Chỉ tiêu"], ["map", "Ánh xạ 2244 ↔ 137"], ["find", "Phát hiện chính"]], location.hash.slice(1) || "ind", "Mục quản trị");
+const showTab = (v) => { ["ind", "map", "find"].forEach((t) => $("t-" + t).hidden = t !== v); history.replaceState(null, "", "#" + v); };
+onSeg("tab", showTab);
+showTab(["ind", "map", "find"].includes(location.hash.slice(1)) ? location.hash.slice(1) : "ind");
+$("setWrap").innerHTML = segHtml("set", [["2244", "Bộ 2244"], ["137", "Bộ 137"]], set, "Bộ chỉ tiêu");
+onSeg("set", (v) => { set = v; renderInds(); });
+$("q").addEventListener("input", () => renderInds());
+$("addMap").innerHTML = ic("plus") + "Thêm ánh xạ";
+$("addFind").innerHTML = ic("plus") + "Thêm đoạn";
+$("saveFind").innerHTML = ic("check") + "Lưu";
+
+async function loadSummary() {
+  const s = await api("/api/admin/summary");
+  $("sum").innerHTML = [
+    ["/review", s.pending.toLocaleString("vi-VN"), "Số liệu chờ duyệt"],
+    ["#ind", s.internal_indicators, "Chỉ tiêu nội bộ"],
+    ["#map", s.mappings, "Cặp ánh xạ 2244 ↔ 137"],
+    ["/upload", s.release ? new Date(s.release.created_at + (String(s.release.created_at).endsWith("Z") ? "" : "Z")).toLocaleDateString("vi-VN") : "–", s.release ? `Bản nhập gần nhất · ${s.release.file_name}` : "Chưa nhập file của Cục"],
+  ].map(([href, v, l]) => `<a class="stat" href="${href}"${href.startsWith("#") ? ` data-tab="${href.slice(1)}"` : ""}><span class="l">${esc(l)}</span><span class="v">${esc(String(v))}</span></a>`).join("");
+  $("sum").querySelectorAll("[data-tab]").forEach((a) => a.onclick = (e) => { e.preventDefault(); $("tab").querySelector(`[data-v="${a.dataset.tab}"]`)?.click(); });
+}
+
+// ---------------- chỉ tiêu
+const fold = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d");
+function renderInds() {
+  const f = fold($("q").value.trim());
+  const rows = inds.filter((i) => i.set === set && (!f || fold(i.code).includes(f) || fold(i.name).includes(f)));
+  $("indNote").textContent = `${rows.length} chỉ tiêu · ${rows.filter((i) => i.visibility === "internal").length} nội bộ`;
+  $("indRows").innerHTML = rows.map((i) => `<tr><td><a href="/indicator?code=${encodeURIComponent(i.code)}"><span class="code">${esc(i.code)}</span></a></td>
+    <td>${esc(i.name)}</td>
+    <td><span class="vis ${i.visibility}">${ic(i.visibility === "internal" ? "lock" : "ok")}${i.visibility === "internal" ? "Nội bộ" : "Công khai"}</span></td>
+    <td class="hide-sm">${dataStatus(i.data_status) || '<span class="muted small">–</span>'}</td>
+    <td><button class="btn sm" data-code="${esc(i.code)}">${ic("edit")}Sửa</button></td></tr>`).join("") || `<tr><td colspan="5">${emptyState("Không có chỉ tiêu phù hợp", "search")}</td></tr>`;
+  $("indRows").querySelectorAll("button[data-code]").forEach((b) => b.onclick = () => editInd(inds.find((i) => i.code === b.dataset.code)));
+}
+async function editInd(i) {
+  const v = await formDialog({ title: `${i.code} – ${i.name}`, okLabel: "Lưu", fields: [
+    { name: "visibility", label: "Hiển thị", type: "select", value: i.visibility, options: [["public", "Công khai – mọi người xem được"], ["internal", "Nội bộ – chỉ người đăng nhập"]] },
+    { name: "data_status", label: "Trạng thái dữ liệu (theo Cục)", type: "select", value: i.data_status || "", options: [["", "–"], ...Object.entries(DQ).filter(([k]) => !["simulated", "reference"].includes(k)).map(([k, d]) => [k, d[0]])] },
+    { name: "reason", label: "Lý do thay đổi", type: "textarea", placeholder: "Ghi vào Nhật ký" },
+  ] });
+  if (!v) return;
+  const body = { reason: v.reason };
+  if (v.visibility !== i.visibility) body.visibility = v.visibility;
+  if ((v.data_status || null) !== (i.data_status || null) && v.data_status) body.data_status = v.data_status;
+  if (Object.keys(body).length === 1) return toast("Không có thay đổi");
+  try { await PATCH(`/api/indicators/${encodeURIComponent(i.code)}`, body); toast(`Đã cập nhật ${i.code}`); await loadInds(); loadSummary(); }
+  catch (e) { toast(e.message, { type: "err" }); }
+}
+async function loadInds() { inds = await api("/api/admin/indicators"); renderInds(); }
+
+// ---------------- ánh xạ
+function renderMaps() {
+  const nm = (c) => (inds.find((i) => i.code === c) || {}).name || "";
+  $("mapRows").innerHTML = maps.map((m) => `<tr>
+    <td><span class="code">${esc(m.code_2244)}</span> <span class="small">${esc(nm(m.code_2244).slice(0, 48))}</span></td>
+    <td><span class="code">${esc(m.code_137)}</span> <span class="small">${esc(nm(m.code_137).slice(0, 40))}</span>${m.is_simulated ? " " + simBadge() : ""}</td>
+    <td class="hide-sm">${esc(REL[m.relation] || m.relation)}</td><td class="hide-sm small">${esc(m.rule || "–")}</td><td class="hide-sm small">${esc(m.note || "")}</td>
+    <td><div class="acts2"><button class="btn sm" data-e="${m.id}" aria-label="Sửa">${ic("edit")}</button><button class="btn sm" data-d="${m.id}" aria-label="Xoá">${ic("trash")}</button></div></td></tr>`).join("")
+    || `<tr><td colspan="6">${emptyState("Chưa có cặp ánh xạ", "inbox")}</td></tr>`;
+  $("mapRows").querySelectorAll("[data-e]").forEach((b) => b.onclick = () => editMap(maps.find((m) => m.id === +b.dataset.e)));
+  $("mapRows").querySelectorAll("[data-d]").forEach((b) => b.onclick = () => delMap(maps.find((m) => m.id === +b.dataset.d)));
+}
+async function editMap(m) {
+  const opt = (s) => inds.filter((i) => i.set === s).map((i) => [i.code, `${i.code} – ${i.name.slice(0, 60)}`]);
+  const v = await formDialog({ title: m ? "Sửa ánh xạ" : "Thêm ánh xạ 2244 ↔ 137", icon: "refresh", fields: [
+    { name: "code_2244", label: "Chỉ tiêu 2244", type: "select", value: m?.code_2244, options: opt("2244") },
+    { name: "code_137", label: "Chỉ tiêu 137", type: "select", value: m?.code_137, options: opt("137") },
+    { name: "relation", label: "Quan hệ", type: "select", value: m?.relation || "identical", options: Object.entries(REL) },
+    { name: "rule", label: "Quy tắc gộp", value: m?.rule || "", placeholder: "vd. sum: tháng → quý → năm" },
+    { name: "note", label: "Ghi chú", type: "textarea", value: m?.note || "" },
+  ] });
+  if (!v) return;
+  try {
+    const r = m ? await PATCH(`/api/admin/mappings/${m.id}`, { ...v, is_simulated: m.is_simulated }, "PUT") : await PATCH("/api/admin/mappings", v, "POST");
+    const rc = r.recompute || {}, n = Object.entries(rc).filter(([k]) => k.startsWith("recomputed_")).reduce((a, [, v]) => a + v, 0);
+    toast(`Đã lưu; tính lại ${n} kỳ từ bộ 137${rc.mismatch ? `, ${rc.mismatch} kỳ lệch chờ duyệt` : ""}`);
+    await loadMaps(); loadSummary();
+  } catch (e) { toast(e.message, { type: "err" }); }
+}
+async function delMap(m) {
+  const ok = await dialog({ title: `Xoá ánh xạ ${m.code_2244} ↔ ${m.code_137}?`, message: "Số tính lại từ bộ 137 của chỉ tiêu này sẽ bị gỡ khỏi bản hiện hành (vẫn giữ trong lịch sử).", tone: "danger", icon: "trash", okLabel: "Xoá" });
+  if (!ok) return;
+  try { const r = await api(`/api/admin/mappings/${m.id}`, { method: "DELETE" }); toast(`Đã xoá; gỡ ${r.retired_points} số tính lại`); await loadMaps(); loadSummary(); }
+  catch (e) { toast(e.message, { type: "err" }); }
+}
+async function loadMaps() { maps = await api("/api/admin/mappings"); renderMaps(); }
+$("addMap").onclick = () => editMap(null);
+
+// ---------------- phát hiện chính
+function renderFinds() {
+  $("finds").innerHTML = finds.map((f, i) => `<section class="card fc" data-i="${i}">
+    <div class="top"><input class="field" value="${esc(f.title)}" data-k="title" aria-label="Tiêu đề đoạn ${i + 1}" placeholder="Tiêu đề">
+      <label class="pub"><input type="checkbox" data-k="published" ${f.published ? "checked" : ""}>Hiển thị</label>
+      <button class="btn sm" data-del="${i}" aria-label="Xoá đoạn">${ic("trash")}</button></div>
+    <textarea data-k="text" aria-label="Nội dung đoạn ${i + 1}" placeholder="Nội dung">${esc(f.text)}</textarea></section>`).join("") || emptyState("Chưa có đoạn nào", "inbox");
+  $("finds").querySelectorAll("[data-k]").forEach((el) => el.oninput = el.onchange = () => {
+    const f = finds[+el.closest("[data-i]").dataset.i]; f[el.dataset.k] = el.type === "checkbox" ? el.checked : el.value;
+  });
+  $("finds").querySelectorAll("[data-del]").forEach((b) => b.onclick = () => { finds.splice(+b.dataset.del, 1); renderFinds(); });
+}
+$("addFind").onclick = () => { finds.push({ title: "", text: "", published: true }); renderFinds(); $("finds").lastElementChild.querySelector("input").focus(); };
+$("saveFind").onclick = async () => {
+  if (finds.some((f) => !f.title.trim() || !f.text.trim())) return toast("Mỗi đoạn cần có tiêu đề và nội dung", { type: "err" });
+  const v = await formDialog({ title: "Lưu \"Phát hiện chính\"", icon: "check", fields: [{ name: "reason", label: "Lý do / căn cứ biên tập", type: "textarea" }] });
+  if (!v) return;
+  try { finds = await PATCH("/api/admin/findings", { items: finds, reason: v.reason }, "PUT"); renderFinds(); toast("Đã lưu; trang Tổng quan đã cập nhật"); }
+  catch (e) { toast(e.message, { type: "err" }); }
+};
+
+$("indRows").innerHTML = skeletonRows(8, 5);
+Promise.all([loadSummary(), loadInds(), api("/api/admin/findings").then((f) => { finds = f; renderFinds(); })])
+  .then(loadMaps).catch((e) => toast("Không tải được dữ liệu: " + e.message, { type: "err" }));
+</script>
+</body>
+</html>

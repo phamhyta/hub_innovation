@@ -3,29 +3,25 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Innovation Hub – Đề xuất tiêu chí</title>
+<title>Đề xuất tiêu chí – Dữ liệu Đổi mới sáng tạo</title>
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/common.js"></script>
+<script src="/static/illus.js"></script>
 <script src="/static/charts.js"></script>
 <style>
   .sg { display: grid; grid-template-columns: 1fr 200px; gap: 14px; }
-  .sg .side { border-left: 1px solid var(--line); padding-left: 14px; }
+  .sg .aside { border-left: 1px solid var(--line); padding-left: 14px; }
   .sg h3 { margin: 2px 0 6px; font-size: 15px; }
   .sg .k { color: var(--muted); font-size: 12px; }
   .meter { display: grid; grid-template-columns: 70px 1fr 34px; gap: 6px; align-items: center; font-size: 12px; margin: 3px 0; }
   .card.accepted { border-color: var(--ok); } .card.rejected { opacity: .65; }
-  @media (max-width: 760px) { .sg { grid-template-columns: 1fr; } .sg .side { border-left: 0; padding-left: 0; } }
+  @media (max-width: 760px) { .sg { grid-template-columns: 1fr; } .sg .aside { border-left: 0; padding-left: 0; } }
 </style>
 </head>
 <body>
 <main>
-  <p class="muted">Hệ thống thu thập dữ liệu <b>ngoài</b> bộ chỉ tiêu được giao (công bố, nhà khoa học, tổ chức, sáng chế, doanh nghiệp, tuyển dụng), so với registry hiện có để tìm <b>khoảng trống</b>, rồi đề xuất tiêu chí mới kèm số liệu tính thử. Chuyên gia quyết định chấp nhận hay không.</p>
-  <div class="filters">
-    <label class="small muted">Chuyên gia duyệt <input id="reviewer" class="field" style="width:180px" placeholder="Họ tên"></label>
-    <span class="spacer" style="flex:1"></span>
-    <button class="btn" id="regen">↻ Tạo lại đề xuất từ dữ liệu hiện có</button>
-  </div>
-  <section class="stats" id="kpis"></section>
+  <button class="btn ph-actions" id="regen"></button>
+  <section class="stats" id="kpis" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"></section>
   <div id="list"></div>
 
   <h2 class="section">Nguồn dữ liệu ngoài</h2>
@@ -43,7 +39,7 @@
 renderHeader("/insights");
 const PL = { input: "Đầu vào", output: "Kết quả", efficiency: "Hiệu quả", impact: "Tác động" };
 const TYPE = { education: "Giáo dục", facility: "Viện/cơ sở NC", healthcare: "Y tế", government: "Nhà nước", nonprofit: "Phi lợi nhuận", company: "Doanh nghiệp", other: "Khác", archive: "Lưu trữ", funder: "Quỹ" };
-const STAT = { proposed: ["st-needs_review", "Chờ chuyên gia"], accepted: ["st-published", "Đã chấp nhận"], rejected: ["st-rejected", "Đã từ chối"] };
+const STAT = { proposed: ["st-needs_review", "Chờ duyệt"], accepted: ["st-published", "Đã chấp nhận"], rejected: ["st-rejected", "Đã từ chối"] };
 let instType = "";
 
 const meter = (label, v) => `<div class="meter"><span class="muted">${label}</span><div class="bar"><span class="b1" style="width:${(v || 0) * 100}%"></span></div><b>${Math.round((v || 0) * 100)}</b></div>`;
@@ -51,38 +47,40 @@ const meter = (label, v) => `<div class="meter"><span class="muted">${label}</sp
 async function load() {
   const items = await api("/api/suggestions");
   const n = (s) => items.filter((i) => i.status === s).length;
-  $("kpis").innerHTML = [[items.length, "Đề xuất"], [n("proposed"), "Chờ chuyên gia"], [n("accepted"), "Đã đưa vào registry"], [items.filter((i) => i.warnings && i.warnings.some((w) => w.startsWith("Có thể trùng"))).length, "Có thể trùng chỉ tiêu cũ"]]
+  $("kpis").innerHTML = [[items.length, "Đề xuất"], [n("proposed"), "Chờ duyệt"], [n("accepted"), "Đã chấp nhận"], [items.filter((i) => i.warnings && i.warnings.some((w) => w.startsWith("Có thể trùng"))).length, "Có thể trùng"]]
     .map(([v, l]) => `<div class="stat"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
   $("list").innerHTML = items.map((s, i) => {
     const vals = Object.entries(s.values || {}), last = vals[vals.length - 1], st = STAT[s.status];
     return `<section class="card ${s.status}" style="margin-bottom:12px"><div class="sg"><div>
-      <div><span class="status ${st[0]}">${st[1]}</span> <span class="tag">${esc(PL[s.pillar] || "")}</span> ${conf(s.expected_confidence)} <span class="tag">${esc(s.frequency || "")}</span>${s.synthetic ? ' <span class="tag">dữ liệu giả lập</span>' : ""}</div>
-      <h3>${esc(s.name)}</h3>
-      <div class="small">${esc(s.definition)}</div>
-      <div class="small" style="margin-top:4px"><span class="k">Công thức:</span> ${esc(s.formula)}</div>
-      <div class="small"><span class="k">Nguồn:</span> ${s.data_sources.map(esc).join("; ")}</div>
-      <div class="small" style="margin-top:6px"><span class="k">Vì sao đề xuất:</span> ${esc(s.rationale)}</div>
-      ${s.closest ? `<div class="small"><span class="k">Chỉ tiêu gần nhất trong registry:</span> <a href="/indicator?code=${encodeURIComponent(s.closest.code)}">${esc(s.closest.code)}</a> – ${esc(s.closest.name)} (${Math.round(s.closest.similarity * 100)}%)</div>` : ""}
-      ${(s.warnings || []).map((w) => `<div class="warnbox">⚠ ${esc(w)}</div>`).join("")}
-      ${s.reviewer_note ? `<div class="small muted">Ý kiến: ${esc(s.reviewer_note)}</div>` : ""}
-      ${s.status === "proposed" ? `<div style="margin-top:8px"><button class="btn ok sm" onclick="act(${s.id},'accept')">✓ Chấp nhận – đưa vào registry</button> <button class="btn danger sm" onclick="act(${s.id},'reject')">✕ Từ chối</button></div>`
-        : s.accepted_code ? `<div style="margin-top:8px"><a class="btn sm" href="/indicator?code=${encodeURIComponent(s.accepted_code)}">Xem chỉ tiêu ${esc(s.accepted_code)} →</a></div>` : ""}
-    </div><div class="side">
-      <div class="k">Tính thử (${vals.length} kỳ)</div>
+      <div>${status(s.status)} <span class="tag">${esc(PL[s.pillar] || "")}</span> ${conf(s.expected_confidence)}${s.synthetic ? ' <span class="tag">giả lập</span>' : ""}</div>
+      <h3 title="${esc(s.definition)}">${esc(s.name)}</h3>
+      ${(s.warnings || []).filter((w) => w.startsWith("Có thể trùng")).map(() => `<div class="small warn-text">${ic("alert")} Có thể trùng <a href="/indicator?code=${encodeURIComponent(s.closest.code)}">${esc(s.closest.code)}</a></div>`).join("")}
+      <details class="small" style="margin-top:6px"><summary class="muted" style="cursor:pointer">Chi tiết</summary>
+        <div style="margin-top:6px">${esc(s.definition)}</div>
+        <div><span class="k">Công thức:</span> ${esc(s.formula)}</div>
+        <div><span class="k">Nguồn:</span> ${s.data_sources.map(esc).join("; ")}</div>
+        <div><span class="k">Lý do:</span> ${esc(s.rationale)}</div>
+        ${s.closest ? `<div><span class="k">Gần nhất:</span> <a href="/indicator?code=${encodeURIComponent(s.closest.code)}">${esc(s.closest.code)}</a> – ${esc(s.closest.name)} (${Math.round(s.closest.similarity * 100)}%)</div>` : ""}
+        ${s.reviewer_note ? `<div><span class="k">Ý kiến:</span> ${esc(s.reviewer_note)}</div>` : ""}
+      </details>
+      ${s.status === "proposed" ? `<div style="margin-top:8px"><button class="btn ok sm" onclick="act(${s.id},'accept')">${ic("check")}Chấp nhận</button> <button class="btn danger sm" onclick="act(${s.id},'reject')">${ic("x")}Từ chối</button></div>`
+        : s.accepted_code ? `<div style="margin-top:8px"><a class="btn sm" href="/indicator?code=${encodeURIComponent(s.accepted_code)}">${esc(s.accepted_code)} ${ic("arrow")}</a></div>` : ""}
+    </div><div class="aside">
+      <div class="k">Tính thử</div>
       <div style="font-size:20px;font-weight:600">${last ? fmt(last[1], 2) : "–"} <span class="small muted">${esc(s.unit)}${last ? " · " + esc(last[0]) : ""}</span></div>
       <div id="sp${i}"></div>
       <div style="margin-top:8px">${meter("Độ mới", s.novelty)}${meter("Khả thi", s.feasibility)}${meter("Ưu tiên", s.priority)}</div>
     </div></div></section>`;
-  }).join("") || '<div class="muted">Chưa có đề xuất. Chạy các bộ thu thập bên dưới rồi bấm "Tạo lại đề xuất".</div>';
+  }).join("") || emptyState("Chưa có đề xuất", "spark");
   items.forEach((s, i) => sparkline($("sp" + i), Object.entries(s.values || {}).slice(-10).map(([x, y]) => ({ x, y }))));
 }
 
 async function loadCols() {
   const cs = await api("/api/external/collectors");
-  $("cols").innerHTML = cs.map((c) => { const r = c.last_run; return `<tr><td><b>${esc(c.title)}</b>${c.synthetic ? ' <span class="tag">giả lập</span>' : ""}<div class="excerpt">${esc(c.description)}</div></td>
+  $("cols").innerHTML = cs.map((c) => { const r = c.last_run; return `<tr><td><b title="${esc(c.description)}">${esc(c.title)}</b>${c.synthetic ? ' <span class="tag">giả lập</span>' : ""}</td>
     <td>${r ? status(r.status) + `<div class="small muted">${when(r.started_at)}</div>` : '<span class="muted">chưa chạy</span>'}</td>
     <td class="small">${r ? (r.error ? `<span class="err-text">${esc(r.error)}</span>` : Object.entries(r.stats).filter(([, v]) => v).map(([k, v]) => `${v} ${k}`).join(" · ")) : ""}</td>
-    <td><button class="btn sm" data-c="${esc(c.name)}">▶ Chạy</button></td></tr>`; }).join("");
+    <td>${can("admin") ? `<button class="btn sm" data-c="${esc(c.name)}">${ic("play")}Chạy</button>` : '<span class="small muted" title="Chạy bộ thu thập: vai trò Quản trị dữ liệu">–</span>'}</td></tr>`; }).join("");
   document.querySelectorAll("[data-c]").forEach((b) => b.onclick = async () => {
     b.disabled = true; b.textContent = "Đang chạy…";
     try { const r = await api(`/api/external/collectors/${b.dataset.c}/run`, { method: "POST" }); toast(`${b.dataset.c}: ${STATUS[r.status]}${r.error ? " – " + r.error : ""}`); } catch (e) { toast(e.message); }
@@ -98,21 +96,27 @@ async function loadInst() {
 }
 
 async function act(id, action) {
-  const reviewer = $("reviewer").value.trim();
-  if (!reviewer) { toast("Nhập tên chuyên gia duyệt trước"); $("reviewer").focus(); return; }
-  setReviewerName(reviewer);
+  const reviewer = await ensureReviewer();
+  if (!reviewer) return;
   let note = null;
-  if (action === "reject") { note = prompt("Lý do từ chối đề xuất:"); if (!note) return; }
-  else note = prompt("Ghi chú khi chấp nhận (không bắt buộc):") || null;
+  if (action === "reject") {
+    note = await dialog({ title: "Từ chối đề xuất?", tone: "danger", icon: "xc", chips: ["Trùng tiêu chí đã có", "Thiếu dữ liệu tin cậy", "Không phù hợp mục tiêu"],
+      input: "textarea", required: true, placeholder: "Lý do (bắt buộc)", okLabel: "Từ chối" });
+    if (!note) return;
+  } else {
+    note = await dialog({ title: "Đưa vào bộ chỉ tiêu?", message: "Tạo chỉ tiêu DX mới; số liệu tính thử vào hàng chờ duyệt.", tone: "ok", icon: "check",
+      input: "textarea", placeholder: "Ghi chú (không bắt buộc)", okLabel: "Chấp nhận" });
+    if (note === null) return;
+    note = note || null;
+  }
   try { const r = await api(`/api/suggestions/${id}/review`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, reviewer, note }) });
     toast(action === "accept" ? `Đã thêm ${r.accepted_code} vào registry – số liệu tính thử đang chờ duyệt` : "Đã từ chối đề xuất"); }
-  catch (e) { toast("Lỗi: " + e.message); }
+  catch (e) { toast("Lỗi: " + e.message, { type: "err" }); }
   load(); refreshBadge();
 }
 
 $("regen").onclick = async () => { const r = await api("/api/suggestions/generate", { method: "POST" }); toast(`Tạo mới ${r.created}, cập nhật ${r.updated}, bỏ qua (thiếu dữ liệu) ${r.skipped_no_data}`); load(); };
-$("reviewer").value = reviewerName();
-$("reviewer").addEventListener("change", () => setReviewerName($("reviewer").value.trim()));
+$("regen").innerHTML = ic("refresh") + "Tạo lại đề xuất";
 load(); loadCols(); loadInst();
 </script>
 </body>

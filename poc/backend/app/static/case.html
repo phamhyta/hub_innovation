@@ -3,13 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Innovation Hub – Scorecard</title>
+<title>Bảng điểm chương trình – Dữ liệu Đổi mới sáng tạo</title>
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/common.js"></script>
+<script src="/static/illus.js"></script>
 </head>
 <body>
 <main>
-  <div class="small no-print"><a href="/cases">← Danh sách case</a></div>
+  <div class="small no-print muted"><a href="/cases">Đánh giá chương trình</a> › Bảng điểm</div>
   <div id="warn"></div>
   <div id="top"></div>
 
@@ -20,9 +21,8 @@
   <div class="filters no-print">
     <label class="small"><input type="checkbox" id="onlyScored" checked> Chỉ hiện tiêu chí đã có điểm</label>
     <span class="spacer" style="flex:1"></span>
-    <label class="small muted">Người duyệt <input id="reviewer" class="field" style="width:170px" placeholder="Họ tên"></label>
-    <button class="btn" id="compute">↻ Tính lại từ OpenAlex</button>
-    <button class="btn" onclick="print()">🖨 In scorecard</button>
+    <button class="btn" id="compute"></button>
+    <button class="btn" id="printBtn" onclick="print()"></button>
   </div>
   <div class="table-wrap"><table id="crit"></table></div>
 
@@ -53,7 +53,7 @@
   </div>
 </main>
 <script>
-renderHeader("/cases");
+renderHeader("/cases", { header: false });
 const qs = new URLSearchParams(location.search), id = qs.get("id");
 const METHOD = { openalex: "OpenAlex", derived: "Suy ra", declared: "Kê khai", rubric: "Hội đồng chấm", manual: "Nhập tay" };
 const CSTATUS = { needs_review: ["st-needs_review", "Chờ duyệt"], verified: ["st-published", "Đã xác nhận"], rejected: ["st-rejected", "Loại"] };
@@ -68,29 +68,29 @@ function render() {
   const c = sc.case, m = c.meta, lc = m.last_computed || {};
   $("top").innerHTML = `
     <h2 style="margin:8px 0 4px">${esc(c.name)} ${m.demo ? '<span class="tag">giả lập</span>' : ""}</h2>
-    <p class="muted small">${esc(c.description || "")}</p>
+    <p class="muted small" title="${esc(c.description || "")}" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:0 0 14px">${esc(c.description || "")}</p>
     <section class="stats">
-      <div class="stat"><div class="score-big">${sc.overall != null ? sc.overall.toFixed(1) : "–"}<span class="small muted">/100</span></div><div class="l">Điểm tổng (trung bình các nhóm)</div></div>
+      <div class="stat"><div class="score-big">${sc.overall != null ? sc.overall.toFixed(1) : "–"}<span class="small muted">/100</span></div><div class="l" title="Trung bình điểm các nhóm">Điểm tổng</div></div>
       <div class="stat" style="grid-column:span 2"><div style="font-weight:600;font-size:15px">${esc(sc.verdict)}</div>
-        <div class="small muted">${sc.provisional ? '<span class="status st-needs_review">Tạm tính</span> còn tiêu chí chưa được xác nhận · ' : ""}${sc.coverage.scored}/${sc.coverage.total} tiêu chí có điểm</div>
-        ${sc.strengths.length ? `<div class="small">Điểm mạnh: ${sc.strengths.map(esc).join(", ")}</div>` : ""}${sc.weaknesses.length ? `<div class="small">Cần cải thiện: ${sc.weaknesses.map(esc).join(", ")}</div>` : ""}</div>
-      <div class="stat"><div class="v">${m.dois ? m.dois.length : 0} DOI · ${m.author_ids ? m.author_ids.length : 0} TG</div><div class="l">${lc.at ? "Tính lúc " + when(lc.at) : "Chưa tính"}${m.budget_billion_vnd ? ` · kinh phí ${fmt(m.budget_billion_vnd)} tỷ` : ""}</div></div>
+        <div class="small muted" style="margin-top:4px">${sc.provisional ? status("needs_review").replace("Chờ duyệt", "Tạm tính") + " " : ""}${sc.coverage.scored}/${sc.coverage.total} tiêu chí</div>
+        ${sc.strengths.length ? `<div class="small" style="margin-top:6px"><span class="delta up">▲</span> ${sc.strengths.map((x) => `<span class="code">${esc(x)}</span>`).join(" ")}</div>` : ""}${sc.weaknesses.length ? `<div class="small" style="margin-top:4px"><span class="delta down">▼</span> ${sc.weaknesses.map((x) => `<span class="code">${esc(x)}</span>`).join(" ")}</div>` : ""}</div>
+      <div class="stat"><div class="v">${m.dois ? m.dois.length : 0} DOI · ${m.author_ids ? m.author_ids.length : 0} TG</div><div class="l" title="${lc.at ? "Tính lúc " + when(lc.at) : "Chưa tính"}">${m.budget_billion_vnd ? `${fmt(m.budget_billion_vnd)} tỷ đồng` : "Nguồn OpenAlex"}</div></div>
     </section>`;
   $("groups").innerHTML = sc.groups.map((g) => `<div style="display:grid;grid-template-columns:minmax(140px,220px) 1fr 90px;gap:10px;align-items:center;margin:6px 0">
-      <div>${esc(g.group_code)}. ${esc(g.group_name)}</div><div>${scoreBar(g.score)}</div><div class="small muted">${g.scored}/${g.total} tiêu chí</div></div>`).join("");
+      <div>${esc(g.group_code)}. ${esc(g.group_name)}</div><div>${scoreBar(g.score)}</div><div class="small muted">${g.scored}/${g.total}</div></div>`).join("");
   const only = $("onlyScored").checked;
   let last = null, rows = "";
   for (const r of sc.criteria) {
     if (only && r.value == null) continue;
     if (r.group_code !== last) { rows += `<tr class="pillar"><td colspan="8" style="background:var(--bg);font-weight:600">${esc(r.group_code)}. ${esc(r.group_name)}</td></tr>`; last = r.group_code; }
     const st = CSTATUS[r.status];
-    const ev = r.evidence_ids.map((e) => `<a href="/api/evidence/${e}" class="small">dữ liệu nguồn ↓</a>`).join(" ") + (r.evidence_url ? ` <a class="small" href="${esc(r.evidence_url)}" target="_blank" rel="noopener">minh chứng ↗</a>` : "");
+    const ev = r.evidence_ids.map((e) => `<a href="/api/evidence/${e}" class="small">dữ liệu nguồn</a>`).join(" ") + (r.evidence_url ? ` <a class="small" href="${esc(r.evidence_url)}" target="_blank" rel="noopener">minh chứng ↗</a>` : "");
     rows += `<tr><td class="code">${esc(r.code)}</td><td>${esc(r.name)}<div class="excerpt">${esc(r.rationale || r.rule_note || "")}</div>${ev}</td>
       <td class="num">${r.value != null ? fmt(r.value) : "–"} <span class="small muted">${esc(r.unit || "")}</span></td>
       <td class="num">${r.target != null ? fmt(r.target) : "–"}${r.higher_is_better === false ? '<div class="small muted">tối đa</div>' : ""}</td>
       <td style="min-width:130px">${scoreBar(r.score)}</td><td><span class="tag">${esc(METHOD[r.method] || r.method)}</span></td>
       <td>${st ? `<span class="status ${st[0]}">${st[1]}</span>` : ""}</td>
-      <td class="no-print" style="white-space:nowrap">${r.value != null ? `<button class="btn ok sm" onclick="rev('${r.code}','approve')">✓</button> <button class="btn danger sm" onclick="rev('${r.code}','reject')">✕</button>` : ""}</td></tr>`;
+      <td class="no-print" style="white-space:nowrap">${r.value != null ? `<button class="btn ok sm" onclick="rev('${r.code}','approve')" title="Xác nhận" aria-label="Xác nhận">${ic("check")}</button> <button class="btn danger sm" onclick="rev('${r.code}','reject')" title="Loại" aria-label="Loại">${ic("x")}</button>` : ""}</td></tr>`;
   }
   $("crit").innerHTML = `<thead><tr><th>Mã</th><th>Tiêu chí</th><th class="num">Đạt</th><th class="num">Mục tiêu</th><th>Điểm</th><th>Cách lấy</th><th>Trạng thái</th><th class="no-print"></th></tr></thead><tbody>${rows}</tbody>`;
   $("trlLevel").innerHTML = Object.entries(sc.trl_levels).map(([k, v]) => `<option value="${k}" ${m.trl && m.trl.level == k ? "selected" : ""}>TRL ${k} – ${esc(v)}</option>`).join("");
@@ -101,20 +101,25 @@ function render() {
 async function load() { sc = await api("/api/cases/" + id); render(); }
 
 async function rev(code, action) {
-  const reviewer = $("reviewer").value.trim();
-  if (!reviewer) { toast("Nhập tên người duyệt trước"); $("reviewer").focus(); return; }
-  setReviewerName(reviewer);
+  const reviewer = await ensureReviewer();
+  if (!reviewer) return;
   let note = null;
-  if (action === "reject") { note = prompt(`Lý do loại điểm ${code}:`); if (!note) return; }
+  if (action === "reject") {
+    note = await dialog({ title: `Loại điểm ${code}?`, message: "Tiêu chí bị loại sẽ không tính vào điểm tổng.", tone: "danger", icon: "xc",
+      chips: ["Thiếu minh chứng", "Số liệu không khớp", "Sai kỳ đánh giá"], input: "textarea", required: true, placeholder: "Lý do (bắt buộc)", okLabel: "Loại điểm" });
+    if (!note) return;
+  }
   try { sc = await api(`/api/cases/${id}/scores/${encodeURIComponent(code)}/review`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, reviewer, note }) }); render(); }
-  catch (e) { toast("Lỗi: " + e.message); }
+  catch (e) { toast("Lỗi: " + e.message, { type: "err" }); }
 }
 
+const COMPUTE_LABEL = ic("refresh") + "Tính lại từ OpenAlex";
+$("compute").innerHTML = COMPUTE_LABEL; $("printBtn").innerHTML = ic("printer") + "In";
 $("compute").onclick = async () => {
   $("compute").disabled = true; $("compute").textContent = "Đang lấy dữ liệu OpenAlex…";
   try { const r = await api(`/api/cases/${id}/compute`, { method: "POST" }); sc = r.scorecard; render(); toast(`Đã tính lại: ${r.summary.articles ?? 0} bài, ${r.summary.authors_found ?? 0} tác giả tìm thấy`); }
-  catch (e) { toast(e.message, 8000); }
-  $("compute").disabled = false; $("compute").textContent = "↻ Tính lại từ OpenAlex";
+  catch (e) { toast(e.message, { type: "err" }); }
+  $("compute").disabled = false; $("compute").innerHTML = COMPUTE_LABEL;
 };
 $("onlyScored").addEventListener("change", render);
 
@@ -134,7 +139,6 @@ $("manForm").addEventListener("submit", async (e) => {
 });
 
 (async () => {
-  $("reviewer").value = reviewerName();
   if (qs.get("warn")) $("warn").innerHTML = `<div class="warnbox">${esc(qs.get("warn"))}</div>`;
   await load();
   const s = await api(`/api/cases/${id}/trl-suggestion`);

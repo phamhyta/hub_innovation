@@ -1,3 +1,4 @@
+from app.connectors.api_dinh import ApiDinhConnector
 from app.connectors.base import Connector
 from app.connectors.international import (
     EGDIConnector,
@@ -19,5 +20,6 @@ REGISTRY: dict[str, Connector] = {
         OpenAlexConnector(),
         WorldBankConnector(),
         NEACConnector(),
+        ApiDinhConnector(),
     )
 }

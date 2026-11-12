@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Đánh giá tổng hợp – Dữ liệu Đổi mới sáng tạo</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/common.js"></script>
+<script src="/static/illus.js"></script>
+<style>
+  .lg { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-size: 12.5px; color: var(--text-2); margin-bottom: 14px; }
+  .lg .t { color: var(--text-3); }
+  .ev { display: inline-flex; align-items: center; gap: 8px; }
+  .meter { display: inline-flex; gap: 2px; }
+  .meter i { width: 14px; height: 10px; border-radius: 2px; background: var(--grid); }
+  .meter i:first-child { border-radius: 4px 2px 2px 4px; } .meter i:last-child { border-radius: 2px 4px 4px 2px; }
+  .r1 { --c: var(--ord-1); } .r2 { --c: var(--ord-2); } .r3 { --c: var(--ord-3); } .r4 { --c: var(--ord-4); }
+  .meter.on1 i:nth-child(-n+1), .meter.on2 i:nth-child(-n+2), .meter.on3 i:nth-child(-n+3), .meter.on4 i:nth-child(-n+4) { background: var(--c); }
+  .ev b { font-size: 13px; }
+  .ev small { color: var(--text-3); font-weight: 500; margin-right: 2px; }
+  .sc { display: grid; gap: 14px; }
+  .row { display: grid; grid-template-columns: 200px repeat(3, minmax(0, 1fr)); gap: 0; padding: 0; overflow: hidden; }
+  .row > div { padding: 16px 18px; }
+  .row > div + div { border-left: 1px solid var(--border); }
+  .row .dim { background: var(--surface-2); }
+  .row .dim h3 { margin: 0; font-size: 15px; line-height: 1.35; }
+  .row .dim .en { font-size: 12px; color: var(--text-3); margin-top: 4px; }
+  .row .k { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); margin-bottom: 6px; }
+  .row p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--text); }
+  .row .evs { display: grid; gap: 6px; margin-bottom: 8px; }
+  .orig { font-size: 11px; font-weight: 600; color: var(--warn); background: var(--warn-soft); border-radius: 4px; padding: 0 5px; margin-left: 4px; }
+  .head { display: grid; grid-template-columns: 200px repeat(3, minmax(0, 1fr)); font-size: 12px; font-weight: 600; color: var(--text-3); padding: 0 1px; }
+  .head span { padding: 0 18px; }
+  @media (max-width: 980px) {
+    .head { display: none; }
+    .row { grid-template-columns: 1fr; }
+    .row > div + div { border-left: 0; border-top: 1px solid var(--border); }
+  }
+  @media (min-width: 981px) { .row .k { display: none; } }
+</style>
+</head>
+<body>
+<main>
+  <button class="btn ph-actions" id="lang" aria-pressed="false"></button>
+  <div class="lg" id="lg"></div>
+  <div class="head" aria-hidden="true"><span>Chiều đánh giá</span><span>Chẩn đoán</span><span>Mức bằng chứng</span><span>Hàm ý chính sách</span></div>
+  <div class="sc" id="sc"></div>
+  <p class="small muted" id="src"></p>
+</main>
+<script>
+renderHeader("/scorecard");
+let data = null, en = false;
+const meter = (rank) => `<span class="meter on${rank} r${rank}" aria-hidden="true"><i></i><i></i><i></i><i></i></span>`;
+const evHtml = (l) => `<span class="ev">${meter(l.rank)}<span>${l.qualifier ? `<small>${esc(l.qualifier)}:</small>` : ""}<b>${esc(l.label)}</b></span></span>`;
+const txt = (v, orig) => en ? esc(orig || "") : v.text ? `${esc(v.text)}${v.original ? '<span class="orig" title="Chưa có bản tiếng Việt khớp với nội dung mới">Nguyên văn</span>' : ""}` : "–";
+
+function render() {
+  $("lang").innerHTML = ic("file") + (en ? "Xem bản tiếng Việt" : "Xem nguyên văn (EN)");
+  $("lang").setAttribute("aria-pressed", en);
+  $("lg").innerHTML = `<span class="t">Mức bằng chứng:</span>` + data.levels.map((l) => evHtml(l)).join("");
+  $("sc").innerHTML = data.rows.map((r) => `<section class="card row">
+    <div class="dim"><h3>${esc(r.dimension_vi)}</h3>${r.dimension_vi !== r.dimension ? `<div class="en">${esc(r.dimension)}</div>` : ""}</div>
+    <div><div class="k">Chẩn đoán</div><p>${txt(r.diagnosis, r.original.diagnosis)}</p></div>
+    <div><div class="k">Mức bằng chứng</div>${en ? `<p>${esc(r.original.evidence_status)}</p>` : `<div class="evs">${r.evidence_levels.map(evHtml).join("")}</div><p>${txt(r.evidence_detail)}</p>`}</div>
+    <div><div class="k">Hàm ý chính sách</div><p>${txt(r.policy_implication, r.original.policy_implication)}</p></div>
+  </section>`).join("") || emptyState("Chưa nhập scorecard", "grid");
+  $("src").textContent = `Nguồn: ${data.source}. Bản tiếng Việt do hệ thống biên dịch; khi Cục cập nhật nội dung, phần chưa có bản dịch hiển thị nguyên văn.`;
+}
+$("lang").onclick = () => { en = !en; render(); };
+api("/api/scorecard").then((d) => { data = d; render(); }).catch((e) => toast("Không tải được dữ liệu: " + e.message, { type: "err" }));
+</script>
+</body>
+</html>

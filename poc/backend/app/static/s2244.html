@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chỉ tiêu 2244 – Dữ liệu Đổi mới sáng tạo</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/common.js"></script>
+<script src="/static/illus.js"></script>
+<script src="/static/charts.js"></script>
+<style>
+  .ctl { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-bottom: 14px; }
+  .ctl .lab { font-size: 12.5px; color: var(--text-3); margin-right: 6px; }
+  .ts td { vertical-align: middle; }
+  .ts .nm { font-weight: 500; }
+  .ts .nm .tags { margin-top: 3px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .ts .val { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ts .val small { color: var(--text-3); font-weight: 500; margin-left: 3px; }
+  .ts tr.grp td { background: var(--surface-2); font-weight: 700; font-size: 13px; }
+  .ts tr.click { cursor: pointer; }
+  .ts tr.click:hover td { background: #F8FAFF; }
+</style>
+</head>
+<body>
+<main>
+  <div class="ctl" id="ctl"></div>
+  <div class="table-wrap"><table class="ts">
+    <thead><tr><th style="width:74px">Mã</th><th>Chỉ tiêu</th><th class="hide-sm" style="width:90px">Kỳ</th><th class="num" style="width:150px">Giá trị</th><th class="num" style="width:110px" id="chHead">Thay đổi</th><th class="hide-sm" style="width:140px">Xu hướng</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table></div>
+  <p class="small muted" id="note"></p>
+</main>
+<script>
+renderHeader("/s2244");
+const state = { res: "Q", window: 8, change: "pop" };
+$("ctl").innerHTML =
+  `<span><span class="lab">Kỳ</span>${segHtml("res", [["Q", "Quý"], ["Y", "Năm"]], state.res, "Kỳ số liệu")}</span>` +
+  `<span><span class="lab">Cửa sổ</span>${segHtml("win", [[4, "4 kỳ"], [6, "6 kỳ"], [8, "8 kỳ"]], state.window, "Số kỳ gần nhất")}</span>` +
+  `<span><span class="lab">Thay đổi</span>${segHtml("chg", [["pop", "So với kỳ trước"], ["yoy", "Cùng kỳ năm trước"], ["ytd", "Luỹ kế từ đầu năm"]], state.change, "Mức thay đổi")}</span>`;
+onSeg("res", (v) => { state.res = v; load(); });
+onSeg("win", (v) => { state.window = +v; load(); });
+onSeg("chg", (v) => { state.change = v; load(); });
+$("rows").innerHTML = skeletonRows(8, 6);
+
+async function load() {
+  const d = await api(`/api/sets/2244/indicators?res=${state.res}&window=${state.window}&change=${state.change}`);
+  const CH = { pop: state.res === "Q" ? "QoQ" : "YoY", yoy: "YoY", ytd: "YTD" };
+  $("chHead").textContent = CH[state.change];
+  let grp = null, html = "";
+  d.items.forEach((x, i) => {
+    if (x.pillar_label !== grp) { grp = x.pillar_label; html += `<tr class="grp"><td colspan="6">${esc(grp || "Khác")}</td></tr>`; }
+    const l = x.latest;
+    const v = !l ? "–" : l.value == null ? `<span class="muted">${esc(l.value_text || "–")}</span>` : `${fmt(l.value, 3)}<small>${esc(x.unit || "")}</small>`;
+    const tags = [dataStatus(x.data_status), x.simulated ? simBadge() : "", x.fallback ? '<span class="tag" title="Chỉ tiêu không có số liệu quý">Số liệu năm</span>' : "",
+      x.overlap.length ? `<span class="tag" title="Tính lại được từ bộ 137">Trùng 137: ${x.overlap.map(esc).join(", ")}</span>` : ""].join("");
+    html += `<tr class="click" data-code="${esc(x.code)}"><td><span class="code">${esc(x.code)}</span></td>
+      <td><div class="nm">${esc(x.name)}<div class="tags">${tags}</div></div></td>
+      <td class="hide-sm small">${l ? esc(l.period) : "–"}</td><td class="num val">${v}</td>
+      <td class="num">${x.change == null ? '<span class="delta flat">–</span>' : pctTag(x.change, x.change_label)}</td>
+      <td class="hide-sm"><span id="sp${i}"></span></td></tr>`;
+  });
+  $("rows").innerHTML = html || `<tr><td colspan="6">${emptyState("Chưa có số liệu")}</td></tr>`;
+  d.items.forEach((x, i) => x.spark.length > 1 && sparkline($("sp" + i), x.spark, { dashed: x.simulated }));
+  document.querySelectorAll("tr.click").forEach((tr) => tr.onclick = () => location.href = "/indicator?code=" + encodeURIComponent(tr.dataset.code));
+  const sim = d.items.filter((x) => x.simulated).length, fb = d.items.filter((x) => x.fallback).length;
+  $("note").innerHTML = [
+    state.res === "Q" ? `${fb} chỉ tiêu chưa có số liệu quý, hiển thị theo năm.` : "",
+    sim ? `${simBadge()} ${sim} chỉ tiêu dùng số quý giả lập (đường nét đứt); số năm là số thật của Cục.` : "",
+    state.change === "ytd" ? "Luỹ kế từ đầu năm chỉ áp dụng cho chỉ tiêu cộng dồn được (quy tắc gộp: tổng)." : "",
+  ].filter(Boolean).join(" ");
+}
+load().catch((e) => toast("Không tải được dữ liệu: " + e.message, { type: "err" }));
+</script>
+</body>
+</html>

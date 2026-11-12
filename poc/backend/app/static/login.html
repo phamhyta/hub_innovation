@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Đăng nhập – Dữ liệu Đổi mới sáng tạo</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/common.js"></script>
+<script src="/static/illus.js"></script>
+<style>
+  .lwrap { display: grid; grid-template-columns: minmax(0, 420px); justify-content: center; align-content: center; min-height: calc(100vh - 140px); padding: 20px 0; }
+  .lcard { width: 100%; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 28px; }
+  .lcard h1 { margin: 0; font-size: 22px; letter-spacing: -.02em; }
+  .lcard p.sub { margin: 0; color: var(--text-2); font-size: 14px; }
+  .lcard label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+  .lcard .field { width: 100%; }
+  .lcard .btn.primary { width: 100%; justify-content: center; }
+  .roles { display: grid; gap: 8px; }
+  .roles button { display: flex; gap: 12px; align-items: center; text-align: left; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; }
+  .roles button:hover { border-color: var(--primary); background: var(--primary-soft); }
+  .roles button b { display: block; font-size: 14px; } .roles button span { font-size: 12.5px; color: var(--text-3); }
+  .roles button svg.i { color: var(--primary); }
+  .sep { display: flex; align-items: center; gap: 10px; color: var(--text-3); font-size: 12px; }
+  .sep::before, .sep::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .err { color: var(--err); font-size: 13px; min-height: 18px; margin: 0; }
+</style>
+</head>
+<body>
+<main>
+  <div class="lwrap">
+    <section class="card lcard">
+      <div><h1>Đăng nhập</h1><p class="sub" id="why">Dành cho chuyên viên phân tích và quản trị dữ liệu. Người xem không cần đăng nhập.</p></div>
+      <div id="demo" hidden>
+        <div class="roles" id="roles"></div>
+        <div class="sep" style="margin-top:14px">hoặc đăng nhập bằng tài khoản</div>
+      </div>
+      <form id="f" novalidate>
+        <div style="display:grid;gap:12px">
+          <label>Tên đăng nhập<input class="field" id="u" autocomplete="username" required></label>
+          <label>Mật khẩu<input class="field" id="p" type="password" autocomplete="current-password" required></label>
+          <p class="err" id="err" role="alert"></p>
+          <button class="btn primary" id="go" type="submit"></button>
+        </div>
+      </form>
+      <a class="small" href="/">← Về trang tổng quan</a>
+    </section>
+  </div>
+</main>
+<script>
+renderHeader("/login");
+const q = new URLSearchParams(location.search);
+const next = (() => { const n = q.get("next") || "/"; return n.startsWith("/") && !n.startsWith("//") ? n : "/"; })();
+const need = q.get("need");
+const ROLE_DESC = { public: "Xem số liệu đã công bố, phân tích, địa phương", analyst: "Thêm khu nội bộ: đánh giá chương trình, đề xuất, so sánh", admin: "Toàn quyền: nhập, duyệt, sửa số liệu, cờ hiển thị, nhật ký" };
+const ROLE_ICON = { public: "user", analyst: "bars", admin: "settings" };
+$("go").innerHTML = ic("login") + "Đăng nhập";
+if (need && ROLE_RANK[need]) {
+  $("why").innerHTML = `${ic("lock")} Trang này dành cho vai trò <b>${esc(ROLE_LABEL[need])}</b>${need === "analyst" ? " trở lên" : ""}.`
+    + (ME.role !== "public" ? ` Bạn đang đăng nhập với vai trò ${esc(ROLE_LABEL[ME.role])}.` : "");
+}
+
+$("f").onsubmit = async (e) => {
+  e.preventDefault();
+  $("err").textContent = "";
+  if (!$("u").value.trim() || !$("p").value) { $("err").textContent = "Nhập tên đăng nhập và mật khẩu."; return; }
+  $("go").disabled = true;
+  try {
+    await api("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: $("u").value.trim(), password: $("p").value }) });
+    location.href = next;
+  } catch (er) { $("err").textContent = er.message; $("p").select(); }
+  finally { $("go").disabled = false; }
+};
+
+api("/api/auth/me").then((me) => {
+  if (!me.demo_mode) return;
+  $("demo").hidden = false;
+  $("roles").innerHTML = `<div class="small muted">Bản trình diễn: chọn vai trò để xem, không cần mật khẩu.</div>` + me.roles.map((r) =>
+    `<button type="button" data-role="${r.role}">${ic(ROLE_ICON[r.role])}<span><b>${esc(r.label)}${r.role === me.role ? " · đang dùng" : ""}</b><span>${esc(ROLE_DESC[r.role])}</span></span></button>`).join("");
+  $("roles").querySelectorAll("button").forEach((b) => b.onclick = async () => {
+    await api("/api/auth/switch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role: b.dataset.role }) });
+    location.href = b.dataset.role === "public" ? "/" : next;
+  });
+}).catch(() => {});
+$("u").focus();
+</script>
+</body>
+</html>

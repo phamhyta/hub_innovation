@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.calculations import recalculate
 from app.connectors import REGISTRY
 from app.connectors.base import Connector, Fetched, make_client
-from app.datapoints import Observation, UnknownIndicator, upsert_observation
+from app.datapoints import Observation, UnknownIndicator, period_type_of, upsert_observation
 from app.models import CrawlRun, Indicator, IndicatorSource, Source
 from app.storage import save_evidence
 
@@ -37,7 +37,10 @@ def _source_for(session: Session, conn: Connector, url: str) -> Source:
 def _sanity(obs: Observation) -> str | None:
     if obs.value is None and not obs.value_text:
         return "thiếu giá trị"
-    if not str(obs.period).isdigit() or not (1990 <= int(obs.period) <= datetime.now().year + 1):
+    p = str(obs.period)
+    year = p[:4]
+    if not year.isdigit() or not (1990 <= int(year) <= datetime.now().year + 1) or \
+            (period_type_of(p) == "Y" and not p.isdigit()):
         return f"kỳ không hợp lệ: {obs.period}"
     if obs.value is not None and obs.value < 0:
         return "giá trị âm"
@@ -67,6 +70,8 @@ def run_connector(session: Session, name: str, trigger: str = "manual",
             sources[d.url] = _source_for(session, conn, d.url)
         stats["documents"] = len(docs)
 
+        conn.prepare(session, docs)
+        extra = {"is_simulated": True, "data_status": "simulated"} if conn.simulated else None
         cache: dict = {}
         touched: set[str] = set()
         for obs in conn.parse(docs):
@@ -79,7 +84,7 @@ def run_connector(session: Session, name: str, trigger: str = "manual",
                 dp, outcome = upsert_observation(
                     session, obs, origin=f"crawler:{name}", confidence=conn.confidence, extracted_by="crawler",
                     auto_publish=conn.auto_publish, source=sources.get(url), evidence=evidence.get(url),
-                    crawl_run=run, cache=cache,
+                    crawl_run=run, cache=cache, extra=extra,
                 )
             except UnknownIndicator:
                 stats["skipped"] += 1
@@ -100,6 +105,8 @@ def run_connector(session: Session, name: str, trigger: str = "manual",
 
         calc = recalculate(session, touched)
         stats["derived_computed"] = calc["computed"]
+        for k, v in (conn.after_run(session, touched) or {}).items():
+            stats[k] = v
         run.status = "success"
     except Exception as exc:  # noqa: BLE001 – ghi lại mọi lỗi vào lần chạy
         session.rollback()

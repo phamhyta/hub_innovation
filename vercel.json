@@ -3,7 +3,7 @@
   "functions": {
     "api/index.py": {
       "maxDuration": 60,
-      "includeFiles": "poc/{backend/app,backend/scripts,data/raw,data/external,templates,sample_data,deploy}/**"
+      "includeFiles": "poc/{backend/app,backend/scripts,data/raw,data/external,data/seed,templates,sample_data,deploy}/**"
     }
   },
   "rewrites": [{ "source": "/(.*)", "destination": "/api/index?__path=/$1" }]

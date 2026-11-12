@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Đối soát – Dữ liệu Đổi mới sáng tạo</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/common.js"></script>
+<script src="/static/illus.js"></script>
+<style>
+  .sum { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-bottom: 6px; }
+  .rc td { vertical-align: middle; }
+  .rc .num { font-variant-numeric: tabular-nums; }
+  .rc tr.bad td { background: #FFFBFA; }
+  .head2 { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .expl { font-size: 12.5px; color: var(--text-2); max-width: 380px; }
+  @media (max-width: 760px) { .sum { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <a class="btn ph-actions" href="/review?kind=calc&warnings_only=1" id="toReview"></a>
+  <section class="sum" id="sum"></section>
+
+  <div class="head2"><h2 class="section">Chỉ tiêu trùng 2244 ↔ 137</h2><span id="onlyWrap"></span></div>
+  <p class="small muted" style="margin-top:-6px" id="rule"></p>
+  <div class="table-wrap"><table class="rc">
+    <thead><tr><th>Chỉ tiêu 2244</th><th>Tính từ</th><th>Kỳ</th><th class="num">Tính từ 137</th><th class="num">Số của Cục</th><th class="num">Chênh lệch</th><th>Trạng thái duyệt</th></tr></thead>
+    <tbody id="pairs"></tbody></table></div>
+
+  <h2 class="section">Bảng kết quả (01/9) ↔ Báo cáo (15/9)</h2>
+  <p class="small muted" style="margin-top:-6px">Hệ thống dùng số của báo cáo 15/9. Các chỉ tiêu dưới đây lệch giữa hai tài liệu, cần Cục xác nhận.</p>
+  <div class="table-wrap"><table class="rc">
+    <thead><tr><th>Chỉ tiêu</th><th class="num">Bảng kết quả</th><th class="num">Báo cáo</th><th class="num">Chênh lệch</th><th class="hide-sm">Giải thích</th><th>Xác nhận</th></tr></thead>
+    <tbody id="excel"></tbody></table></div>
+</main>
+<script>
+renderHeader("/reconcile");
+$("toReview").innerHTML = ic("review") + "Mở hàng chờ duyệt";
+let only = true, data = null;
+$("onlyWrap").innerHTML = segHtml("only", [["1", "Chỉ chỗ lệch"], ["0", "Tất cả kỳ"]], "1", "Lọc");
+onSeg("only", (v) => { only = v === "1"; renderPairs(); });
+$("pairs").innerHTML = skeletonRows(4, 7);
+$("excel").innerHTML = skeletonRows(4, 6);
+
+const n0 = (v) => v == null ? "–" : fmt(v, 2);
+function renderPairs() {
+  const rows = data.pairs.filter((p) => !only || p.mismatch);
+  $("pairs").innerHTML = rows.map((p) => `<tr class="${p.mismatch ? "bad" : ""}">
+    <td><a href="/indicator?code=${encodeURIComponent(p.code_2244)}"><span class="code">${esc(p.code_2244)}</span></a> <span class="small">${esc(p.name_2244.length > 60 ? p.name_2244.slice(0, 60) + "…" : p.name_2244)}</span></td>
+    <td><a href="/indicator?code=${encodeURIComponent(p.code_137)}"><span class="code">${esc(p.code_137)}</span></a></td>
+    <td class="small">${esc(p.period)}${p.is_simulated ? " " + simBadge() : ""}</td>
+    <td class="num">${n0(p.value_137)}</td><td class="num">${n0(p.value_cuc)}</td>
+    <td class="num">${p.value_cuc == null ? '<span class="small muted">Cục chưa có số</span>' : p.mismatch ? `<b class="err-text">${p.diff_pct > 0 ? "+" : ""}${fmt(p.diff_pct, 1)}%</b>` : '<span class="delta flat">khớp</span>'}</td>
+    <td>${status(p.status)}</td></tr>`).join("")
+    || `<tr><td colspan="7">${emptyState(only ? "Không có chỗ lệch" : "Chưa có số liệu tính lại từ bộ 137", "check")}</td></tr>`;
+}
+
+function renderExcel() {
+  $("excel").innerHTML = data.excel_report.map((r) => `<tr>
+    <td><a href="/indicator?code=${encodeURIComponent(r.indicator_code)}"><span class="code">${esc(r.indicator_code)}</span></a> <span class="small">${esc((r.name || "").slice(0, 56))}${(r.name || "").length > 56 ? "…" : ""}</span><div class="small muted">${esc(r.unit || "")}</div></td>
+    <td class="num">${n0(r.value_excel)}</td><td class="num">${n0(r.value_report)}</td>
+    <td class="num">${r.diff_pct == null ? "–" : `${r.diff_pct > 0 ? "+" : ""}${fmt(r.diff_pct, 1)}%`}</td>
+    <td class="hide-sm"><div class="expl">${esc(r.explanation || "")}</div></td>
+    <td>${r.confirmed_at ? `<span class="status st-verified" title="${esc(r.confirmed_note || "")}">${ic("ok")}Đã xác nhận</span><div class="small muted">${esc(r.confirmed_by || "")}</div>`
+      : `<button class="btn sm" data-code="${esc(r.indicator_code)}">${ic("check")}Xác nhận</button>`}</td></tr>`).join("");
+  $("excel").querySelectorAll("button[data-code]").forEach((b) => b.onclick = () => confirmRow(b.dataset.code));
+}
+
+async function confirmRow(code) {
+  const who = await ensureReviewer();
+  if (!who) return;
+  const note = await dialog({ title: `Xác nhận số liệu ${code}`, message: "Ghi căn cứ xác nhận (văn bản, người cung cấp, số được chọn).", icon: "check", tone: "ok",
+    input: "textarea", required: true, placeholder: "Căn cứ xác nhận (bắt buộc)", okLabel: "Xác nhận" });
+  if (!note) return;
+  try {
+    await api(`/api/reconciliation/excel/${encodeURIComponent(code)}/confirm`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reviewer: who, note }) });
+    toast(`Đã xác nhận ${code}`);
+    await load();
+  } catch (e) { toast(e.message, { type: "err" }); }
+}
+
+async function load() {
+  data = await api("/api/reconciliation");
+  const confirmed = data.excel_report.filter((r) => r.confirmed_at).length;
+  $("sum").innerHTML = [
+    [data.mappings.length, "Cặp chỉ tiêu trùng", data.mappings.some((m) => m.is_simulated) ? "Ánh xạ giả định, chờ danh sách chính thức" : ""],
+    [data.mismatches, "Kỳ lệch 2244 ↔ 137", `Ngưỡng ${fmt(data.threshold_pct, 1)}%; số lệch chờ duyệt`],
+    [`${confirmed}/${data.excel_report.length}`, "Đã xác nhận (Excel ↔ báo cáo)", ""],
+  ].map(([v, l, s]) => `<div class="stat"><span class="l">${l}</span><span class="v">${v}</span><span class="small muted">${esc(s)}</span></div>`).join("");
+  $("rule").textContent = "Số liệu trùng lưu một lần ở bộ 137 (tháng), gộp lên quý và năm theo quy tắc của chỉ tiêu rồi so với số của Cục cùng kỳ. Lệch quá ngưỡng thì vào hàng chờ duyệt.";
+  renderPairs(); renderExcel();
+}
+load().catch((e) => toast("Không tải được dữ liệu: " + e.message, { type: "err" }));
+</script>
+</body>
+</html>

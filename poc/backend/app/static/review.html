@@ -3,117 +3,253 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Innovation Hub – Duyệt dữ liệu</title>
+<title>Hàng chờ duyệt – Dữ liệu Đổi mới sáng tạo</title>
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/common.js"></script>
+<script src="/static/illus.js"></script>
+<style>
+  .seg { display: inline-flex; padding: 3px; background: var(--surface-2); border-radius: 10px; border: 1px solid var(--border); }
+  .seg button { border: 0; background: none; height: 32px; padding: 0 12px; border-radius: 8px; font-weight: 600; font-size: 13px; color: var(--text-2); cursor: pointer; }
+  .seg button.on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .toolbar select { height: 32px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); padding: 0 12px; font-size: 13px; max-width: 260px; }
+  .diff { font: 600 12px var(--mono); }
+  .diff.hi { color: var(--warn); } .diff.lo { color: var(--text-3); }
+  .dr-val { font-size: 40px; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; }
+  .more { display: flex; justify-content: center; margin-top: 14px; }
+</style>
 </head>
 <body>
 <main>
-  <section class="stats" id="stats"></section>
-  <section class="filters">
-    <select id="status"><option value="needs_review">Chờ duyệt</option><option value="published">Đã công bố</option><option value="rejected">Đã từ chối</option></select>
-    <select id="indicator"><option value="">Mọi chỉ tiêu</option></select>
-    <select id="origin"><option value="">Mọi nguồn</option></select>
-    <select id="geography"><option value="Toàn quốc">Toàn quốc</option><option value="*">Mọi địa bàn (gồm tỉnh)</option></select>
-    <span id="scope" class="small"></span>
-    <span class="spacer" style="flex:1"></span>
-    <label class="small muted">Người duyệt <input id="reviewer" class="field" style="width:170px" placeholder="Họ tên"></label>
-  </section>
-  <div class="filters">
-    <span class="count" id="count"></span>
-    <button class="btn ok sm" id="approveSel" disabled>✓ Duyệt &amp; công bố mục đã chọn</button>
-    <button class="btn danger sm" id="rejectSel" disabled>✕ Từ chối mục đã chọn</button>
+  <div class="seg ph-actions" role="tablist" aria-label="Trạng thái">
+    <button data-st="needs_review" class="on">Chờ duyệt</button><button data-st="published">Đã công bố</button><button data-st="rejected">Từ chối</button>
+  </div>
+  <div class="tabs-bar" id="kinds" role="tablist" aria-label="Loại nguồn"></div>
+  <div class="toolbar">
+    <button class="chip on" id="chipGeo" aria-pressed="true">Toàn quốc</button>
+    <button class="chip" id="chipWarn" aria-pressed="false"></button>
+    <select id="indicator" aria-label="Chỉ tiêu"><option value="">+ Chỉ tiêu</option></select>
+    <span id="scope"></span>
+    <span class="grow" style="flex:1"></span>
+    <span class="count" id="count" style="margin:0"></span>
   </div>
   <div class="table-wrap">
-    <table>
-      <thead><tr><th><input type="checkbox" id="all"></th><th>Chỉ tiêu</th><th>Kỳ</th><th class="hide-sm">Địa bàn</th><th>Phân tổ</th><th class="num">Giá trị</th><th class="hide-sm">Đối chiếu nguồn khác</th><th>Nguồn</th><th class="hide-sm">Đoạn trích / minh chứng</th><th></th></tr></thead>
+    <table class="q" id="q">
+      <thead><tr>
+        <th style="width:44px"><input type="checkbox" id="all" aria-label="Chọn tất cả"></th>
+        <th>Chỉ tiêu</th><th class="hide-sm" style="width:68px">Kỳ</th><th class="num" style="width:132px">Giá trị</th>
+        <th class="num hide-sm" style="width:84px" title="Lệch so với nguồn khác đã công bố">Lệch</th><th class="hide-sm" style="width:156px">Nguồn</th>
+      </tr></thead>
       <tbody id="rows"></tbody>
     </table>
   </div>
+  <div class="more" id="more"></div>
+  <div class="keys hide-sm"><span><span class="kbd">J</span> <span class="kbd">K</span> di chuyển</span><span><span class="kbd">X</span> chọn</span><span><span class="kbd">A</span> công bố</span><span><span class="kbd">R</span> từ chối</span><span><span class="kbd">Enter</span> chi tiết</span></div>
 </main>
+
+<div class="bulk" id="bulk" role="region" aria-label="Thao tác hàng loạt">
+  <span><b id="selN">0</b> đã chọn</span>
+  <button class="btn ok sm" id="bulkOk"></button>
+  <button class="btn danger sm" id="bulkNo"></button>
+  <button class="btn ghost sm" id="bulkClr">Bỏ chọn</button>
+</div>
+<div id="drawerRoot"><div class="backdrop" id="backdrop"></div><aside class="drawer" id="drawer" aria-label="Chi tiết số liệu"></aside></div>
+
 <script>
 renderHeader("/review");
 const params = new URLSearchParams(location.search);
 const scope = { submission_id: params.get("submission_id"), crawl_run_id: params.get("crawl_run_id") };
-let items = [];
+const KINDS = [["", "Tất cả"], ["agency", "Đơn vị"], ["crawler", "Tự động"], ["doc", "Tài liệu"], ["external", "Ngoài"], ["calc", "Tự tính"]];
+const REASONS = ["Sai đơn vị", "Lệch nguồn chính thức", "Thiếu minh chứng", "Trùng số liệu", "Sai kỳ/địa bàn"];
+const state = { status: params.get("status") || "needs_review", kind: params.get("kind") || "", geo: params.get("geography") === "*" ? "*" : "Toàn quốc", warn: params.get("warnings_only") === "1", indicator: params.get("indicator") || "", limit: 200 };
+let items = [], total = 0, focusIdx = 0, current = null, summary = null;
+
+$("bulkOk").innerHTML = ic("check") + "Công bố";
+$("bulkNo").innerHTML = ic("x") + "Từ chối";
 
 async function init() {
-  $("reviewer").value = reviewerName();
-  $("reviewer").addEventListener("change", () => setReviewerName($("reviewer").value.trim()));
-  if (params.get("geography")) $("geography").value = params.get("geography");
-  if (params.get("status")) $("status").value = params.get("status");
   const [inds, sum] = await Promise.all([api("/api/indicators?framework=QD2244"), api("/api/review/summary")]);
-  $("indicator").innerHTML += inds.map((i) => `<option value="${esc(i.code)}">${esc(i.code)} – ${esc(i.name.slice(0, 60))}</option>`).join("");
-  $("origin").innerHTML += Object.keys(sum.by_origin).filter((o) => !o.startsWith("calc:")).sort().map((o) => `<option>${esc(o)}</option>`).join("");
-  if (params.get("indicator")) $("indicator").value = params.get("indicator");
-  const sc = scope.submission_id ? `lượt nộp #${scope.submission_id}` : scope.crawl_run_id ? `lần chạy #${scope.crawl_run_id}` : "";
-  if (sc) $("scope").innerHTML = `<span class="tag">Chỉ xem ${esc(sc)}</span> <a href="/review">bỏ lọc</a>`;
-  ["status", "indicator", "origin", "geography"].forEach((id) => $(id).addEventListener("change", load));
-  renderStats(sum);
+  $("indicator").innerHTML += inds.map((i) => `<option value="${esc(i.code)}">${esc(i.code)} · ${esc(i.name.slice(0, 48))}</option>`).join("");
+  $("indicator").value = state.indicator;
+  const sc = scope.submission_id ? `Lượt nộp #${scope.submission_id}` : scope.crawl_run_id ? `Lần chạy #${scope.crawl_run_id}` : "";
+  if (sc) $("scope").innerHTML = `<a class="chip on" href="/review">${esc(sc)} ${ic("x")}</a>`;
+  document.querySelectorAll(".seg button").forEach((b) => b.classList.toggle("on", b.dataset.st === state.status));
+  $("chipGeo").classList.toggle("on", state.geo !== "*");
+  summary = sum;
+  renderKinds();
   load();
 }
 
-function renderStats(s) {
-  refreshBadge(s);
-  const b = s.by_status;
-  $("stats").innerHTML = [[b.needs_review || 0, "Chờ duyệt"], [b.published || 0, "Đã công bố"], [b.rejected || 0, "Đã từ chối"], [s.indicators_with_published_data, "Chỉ tiêu đã có dữ liệu công bố"]]
-    .map(([v, l]) => `<div class="stat"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+function renderKinds() {
+  const counts = { "": 0 };
+  for (const [origin, by] of Object.entries(summary.by_origin)) {
+    const n = by[state.status] || 0, k = originKind(origin);
+    counts[""] += n; counts[k] = (counts[k] || 0) + n;
+  }
+  $("kinds").innerHTML = KINDS.filter(([k]) => !k || counts[k]).map(([k, label]) =>
+    `<button role="tab" data-k="${k}" class="${state.kind === k ? "on" : ""}" aria-selected="${state.kind === k}">${label}<span>${(counts[k] || 0).toLocaleString("vi-VN")}</span></button>`).join("");
+  $("kinds").querySelectorAll("button").forEach((b) => b.onclick = () => { state.kind = b.dataset.k; state.limit = 200; renderKinds(); load(); });
+  refreshBadge(summary);
 }
 
 async function load() {
-  const p = new URLSearchParams({ status: $("status").value, geography: $("geography").value, limit: 1000 });
-  if ($("indicator").value) p.set("indicator", $("indicator").value);
-  if ($("origin").value) p.set("origin", $("origin").value);
+  $("rows").innerHTML = skeletonRows(6, 6);
+  const p = new URLSearchParams({ status: state.status, geography: state.geo, limit: state.limit });
+  if (state.kind) p.set("kind", state.kind);
+  if (state.warn) p.set("warnings_only", "true");
+  if (state.indicator) p.set("indicator", state.indicator);
   for (const [k, v] of Object.entries(scope)) if (v) p.set(k, v);
-  const r = await api("/api/review?" + p);
-  items = r.items;
-  $("count").textContent = `${r.total} điểm dữ liệu${r.total > items.length ? ` (hiển thị ${items.length})` : ""}`;
+  try {
+    const r = await api("/api/review?" + p);
+    items = r.items; total = r.total;
+  } catch (e) { $("rows").innerHTML = `<tr><td colspan="6">${emptyState("Không tải được: " + e.message, "xc")}</td></tr>`; return; }
+  focusIdx = Math.min(focusIdx, Math.max(0, items.length - 1));
+  $("count").textContent = total > items.length ? `${items.length.toLocaleString("vi-VN")} / ${total.toLocaleString("vi-VN")}` : `${total.toLocaleString("vi-VN")} số liệu`;
+  $("chipWarn").innerHTML = `${ic("alert")}Có cảnh báo`;
+  $("chipWarn").classList.toggle("on", state.warn); $("chipWarn").setAttribute("aria-pressed", state.warn);
+  $("more").innerHTML = total > items.length ? `<button class="btn sm" id="loadMore">Tải thêm</button>` : "";
+  if ($("loadMore")) $("loadMore").onclick = () => { state.limit += 200; load(); };
+  render();
+}
+
+function render() {
   $("all").checked = false;
-  const canApprove = $("status").value !== "published", canReject = $("status").value !== "rejected";
-  $("rows").innerHTML = items.map((p) => {
-    const cmp = p.compare ? `${fmt(p.compare.value)} <span class="small muted">(${esc(p.compare.origin)})</span>${p.compare.diff_pct != null ? `<div class="${Math.abs(p.compare.diff_pct) > 25 ? "warn-text" : "small muted"}">lệch ${p.compare.diff_pct > 0 ? "+" : ""}${p.compare.diff_pct.toFixed(1)}%</div>` : ""}` : '<span class="muted small">–</span>';
-    const prev = p.meta.previous_value != null ? `<div class="small muted">trước: ${fmt(p.meta.previous_value)}</div>` : "";
-    const ev = p.evidence_file_id ? `<a class="small" href="/api/evidence/${p.evidence_file_id}" target="_blank">minh chứng ↓</a>` : "";
-    const src = p.meta.doc_url || p.meta.evidence_url;
-    return `<tr>
-      <td><input type="checkbox" class="sel" value="${p.id}"></td>
-      <td><span class="code">${esc(p.indicator_code)}</span><div class="small muted">${esc(p.indicator_name.slice(0, 50))}</div></td>
-      <td>${esc(p.period)}</td>
-      <td class="hide-sm">${esc(p.geography)}</td>
-      <td>${esc(p.breakdown)}${p.warnings.map((w) => `<div class="warn-text">⚠ ${esc(w)}</div>`).join("")}${p.meta.method_note ? `<div class="small muted">${esc(p.meta.method_note)}</div>` : ""}</td>
-      <td class="num"><b>${fmt(p.value)}</b> <span class="small muted">${esc(p.unit || "")}</span>${prev}</td>
-      <td class="hide-sm">${cmp}</td>
-      <td><span class="tag">${esc(p.origin)}</span> ${conf(p.confidence)}</td>
-      <td class="hide-sm"><div class="excerpt">${esc(p.excerpt || "")}</div>${ev} ${src ? `<a class="small" href="${esc(src)}" target="_blank" rel="noopener">nguồn ↗</a>` : ""}</td>
-      <td style="white-space:nowrap">${canApprove ? `<button class="btn ok sm" onclick="act([${p.id}],'approve')">✓</button>` : ""} ${canReject ? `<button class="btn danger sm" onclick="act([${p.id}],'reject')">✕</button>` : ""}</td>
-    </tr>`;
-  }).join("") || '<tr><td colspan="10" class="muted">Không có điểm dữ liệu nào.</td></tr>';
-  $("approveSel").hidden = !canApprove; $("rejectSel").hidden = !canReject;
-  document.querySelectorAll(".sel").forEach((c) => c.addEventListener("change", updateSel));
+  if (!items.length) {
+    const msg = state.status === "needs_review" ? "Không còn số liệu chờ duyệt" : "Không có số liệu";
+    $("rows").innerHTML = `<tr><td colspan="6">${emptyState(msg, state.status === "needs_review" ? "ok" : "inbox", '<a class="btn sm" href="/">Về tổng quan</a>')}</td></tr>`;
+    updateSel(); return;
+  }
+  $("rows").innerHTML = items.map((p, i) => {
+    const d = p.compare && p.compare.diff_pct != null ? p.compare.diff_pct : null;
+    const warn = p.warnings.length ? ` · <span class="warn-text">${ic("alert")} ${p.warnings.length > 1 ? p.warnings.length + " cảnh báo" : "cảnh báo"}</span>` : "";
+    return `<tr data-i="${i}" class="${i === focusIdx ? "focus" : ""}">
+      <td><input type="checkbox" class="cb" aria-label="Chọn ${esc(p.indicator_code)} ${esc(p.period)}"></td>
+      <td title="${esc(p.indicator_code)} · ${esc(p.breakdown || "")} · ${esc(p.indicator_name)}"><span class="t"><span class="code" style="margin-right:6px">${esc(p.indicator_code)}</span>${esc(p.breakdown || p.indicator_name)}</span>
+        <span class="sub">${esc(p.geography)}<span class="hide-sm"> · ${esc(p.indicator_name)}</span>${warn}</span></td>
+      <td class="hide-sm"><span class="code">${esc(p.period)}</span></td>
+      <td class="num"><b>${fmt(p.value)}</b><span class="sub">${esc(p.unit || "")}</span></td>
+      <td class="num hide-sm">${d == null ? '<span class="muted">–</span>' : `<span class="diff ${Math.abs(d) > 25 ? "hi" : "lo"}" title="So với ${esc(originLabel(p.compare.origin))}: ${fmt(p.compare.value)}">${d > 0 ? "+" : ""}${d.toFixed(1)}%</span>`}</td>
+      <td class="hide-sm"><span style="display:flex;align-items:center;gap:6px;min-width:0"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis">${originDot(p.origin)}</span>${conf(p.confidence)}</span></td></tr>`;
+  }).join("");
+  $("rows").querySelectorAll("tr").forEach((tr) => tr.onclick = (e) => {
+    if (e.target.classList.contains("cb")) { updateSel(); return; }
+    focusIdx = +tr.dataset.i; renderFocus(); openDrawer(items[focusIdx]);
+  });
   updateSel();
 }
 
-const selected = () => [...document.querySelectorAll(".sel:checked")].map((c) => Number(c.value));
-function updateSel() { const n = selected().length; $("approveSel").disabled = $("rejectSel").disabled = !n; $("approveSel").textContent = `✓ Duyệt & công bố ${n || ""} mục đã chọn`; $("rejectSel").textContent = `✕ Từ chối ${n || ""} mục đã chọn`; }
-$("all").addEventListener("change", (e) => { document.querySelectorAll(".sel").forEach((c) => (c.checked = e.target.checked)); updateSel(); });
-$("approveSel").onclick = () => act(selected(), "approve");
-$("rejectSel").onclick = () => act(selected(), "reject");
+function renderFocus() { $("rows").querySelectorAll("tr").forEach((tr, i) => tr.classList.toggle("focus", i === focusIdx)); }
+const selectedIds = () => [...$("rows").querySelectorAll(".cb:checked")].map((c) => items[+c.closest("tr").dataset.i].id);
+function updateSel() {
+  $("rows").querySelectorAll("tr[data-i]").forEach((tr) => tr.classList.toggle("sel", tr.querySelector(".cb").checked));
+  const n = selectedIds().length;
+  $("selN").textContent = n;
+  $("bulk").classList.toggle("on", n > 0);
+  $("bulkOk").hidden = state.status === "published"; $("bulkNo").hidden = state.status === "rejected";
+}
+$("all").onchange = (e) => { $("rows").querySelectorAll(".cb").forEach((c) => (c.checked = e.target.checked)); updateSel(); };
+$("bulkClr").onclick = () => { $("rows").querySelectorAll(".cb").forEach((c) => (c.checked = false)); updateSel(); };
+$("bulkOk").onclick = () => act(selectedIds(), "approve");
+$("bulkNo").onclick = () => act(selectedIds(), "reject");
 
+// ---------- panel chi tiết ----------
+async function openDrawer(p) {
+  current = p;
+  const canOk = p.status !== "published", canNo = p.status !== "rejected";
+  const src = p.meta.doc_url || p.meta.evidence_url;
+  $("drawer").innerHTML = `
+    <button class="icon-btn close" onclick="closeDrawer()" aria-label="Đóng">${ic("x")}</button>
+    <span class="code">${esc(p.indicator_code)}</span> ${status(p.status)}
+    <h2>${esc(p.breakdown || p.indicator_name)}</h2>
+    <div class="small muted">${esc(p.indicator_name)}</div>
+    <div style="display:flex;align-items:baseline;gap:8px;margin-top:16px"><span class="dr-val">${fmt(p.value)}</span><span class="muted">${esc(p.unit || "")}</span></div>
+    ${p.meta.previous_value != null ? `<div class="small muted">Giá trị trước: ${fmt(p.meta.previous_value)}</div>` : ""}
+    <div class="kv" style="margin-top:14px"><div class="k">Kỳ · địa bàn</div><div>${esc(p.period)} · ${esc(p.geography)}</div>
+      <div class="k">Nguồn</div><div>${originDot(p.origin)}</div><div class="k">Tin cậy</div><div>${conf(p.confidence)}</div>
+      ${p.meta.method_note ? `<div class="k">Phương pháp</div><div class="small">${esc(p.meta.method_note)}</div>` : ""}</div>
+    ${p.warnings.map((w) => `<div class="warnbox">${ic("alert")}<span>${esc(w)}</span></div>`).join("")}
+    ${p.excerpt ? `<h3>Trích nguồn</h3><div class="quote">${esc(p.excerpt)}</div>` : ""}
+    <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">
+      ${p.evidence_file_id ? `<a class="btn sm" href="/api/evidence/${p.evidence_file_id}" target="_blank">${ic("file")}Minh chứng</a>` : ""}
+      ${src ? `<a class="btn sm" href="${esc(src)}" target="_blank" rel="noopener">${ic("ext")}Trang gốc</a>` : ""}
+      <a class="btn sm" href="/indicator?code=${encodeURIComponent(p.indicator_code)}">${ic("chart")}Chỉ tiêu</a></div>
+    ${p.compare ? `<h3>Đối chiếu</h3><div class="compare"><div class="box"><span class="small muted">Số này</span><b>${fmt(p.value)}</b></div><div class="box"><span class="small muted">${esc(originLabel(p.compare.origin))}</span><b>${fmt(p.compare.value)}</b></div></div>
+      ${p.compare.diff_pct != null ? `<div class="small" style="margin-top:8px">Lệch <b class="${Math.abs(p.compare.diff_pct) > 25 ? "warn-text" : ""}">${p.compare.diff_pct > 0 ? "+" : ""}${p.compare.diff_pct.toFixed(1)}%</b></div>` : ""}` : ""}
+    <h3>Lịch sử</h3><ul class="timeline" id="hist"><li><div class="skel" style="width:200px"></div></li></ul>
+    <div class="drawer-foot">${canNo ? `<button class="btn danger" id="dNo">${ic("x")}Từ chối</button>` : ""}${canOk ? `<button class="btn primary" id="dOk">${ic("check")}Công bố</button>` : ""}</div>`;
+  document.body.classList.add("open");
+  if ($("dOk")) { $("dOk").onclick = () => act([p.id], "approve"); setTimeout(() => $("dOk").focus(), 60); }
+  if ($("dNo")) $("dNo").onclick = () => act([p.id], "reject");
+  try {
+    const h = await api(`/api/data-points/${p.id}/history`);
+    if (current === p) $("hist").innerHTML = h.logs.map((l) => `<li>${esc(STATUS[l.to] || l.to)} · ${esc(l.reviewer || "")} · ${esc(when(l.at))}${l.note ? ` – ${esc(l.note)}` : ""}</li>`).join("");
+  } catch (_) { $("hist").innerHTML = '<li class="muted">Không tải được lịch sử</li>'; }
+}
+function closeDrawer() {
+  if (document.getElementById("drawer").contains(document.activeElement)) { document.activeElement.blur(); $("q").setAttribute("tabindex", "-1"); $("q").focus({ preventScroll: true }); }
+  document.body.classList.remove("open");
+}
+$("backdrop").onclick = closeDrawer;
+
+// ---------- duyệt ----------
 async function act(ids, action) {
-  const reviewer = $("reviewer").value.trim();
-  if (!reviewer) { toast("Nhập tên người duyệt trước (ô góc phải)"); $("reviewer").focus(); return; }
-  setReviewerName(reviewer);
+  if (!ids.length) return;
+  const reviewer = await ensureReviewer();
+  if (!reviewer) return;
   let note = null;
-  if (action === "reject") { note = prompt(`Lý do từ chối ${ids.length} điểm dữ liệu:`); if (!note) return; }
+  if (action === "reject") {
+    note = await dialog({ title: `Từ chối ${ids.length} số liệu?`, message: "Lý do được lưu vào nhật ký duyệt.", tone: "danger", icon: "xc",
+      chips: REASONS, input: "textarea", required: true, placeholder: "Lý do (bắt buộc)", okLabel: "Từ chối" });
+    if (!note) return;
+  } else if (ids.length > 50) {
+    const ok = await dialog({ title: `Công bố ${ids.length} số liệu?`, message: "Số liệu sẽ xuất hiện trên tổng quan và báo cáo.", tone: "ok", icon: "check", okLabel: "Công bố" });
+    if (!ok) return;
+  }
   try {
     const r = await api("/api/review/actions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids, action, reviewer, note }) });
-    toast(`${action === "approve" ? "Đã công bố" : "Đã từ chối"} ${r.changed.length} điểm${r.skipped.length ? `, bỏ qua ${r.skipped.length}` : ""}`);
-  } catch (e) { toast("Lỗi: " + e.message); }
-  renderStats(await api("/api/review/summary"));
-  load();
+    closeDrawer();
+    toast(`${action === "approve" ? "Đã công bố" : "Đã từ chối"} ${r.changed.length} số liệu${r.skipped.length ? ` · bỏ qua ${r.skipped.length}` : ""}`,
+      r.changed.length ? { action: { label: "Hoàn tác", fn: () => undo(r.changed, reviewer) } } : {});
+  } catch (e) { toast("Lỗi: " + e.message, { type: "err" }); }
+  summary = await api("/api/review/summary"); renderKinds(); load();
+}
+// Hoàn tác = mở lại (đưa về hàng chờ duyệt), có ghi nhật ký
+async function undo(ids, reviewer) {
+  try {
+    await api("/api/review/actions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids, action: "reopen", reviewer, note: "Hoàn tác" }) });
+    toast(`Đã đưa ${ids.length} số liệu về hàng chờ`);
+  } catch (e) { toast("Không hoàn tác được: " + e.message, { type: "err" }); }
+  summary = await api("/api/review/summary"); renderKinds(); load();
 }
 
-init();
+// ---------- lọc ----------
+document.querySelectorAll(".seg button").forEach((b) => b.onclick = () => {
+  state.status = b.dataset.st; state.limit = 200; focusIdx = 0;
+  document.querySelectorAll(".seg button").forEach((x) => x.classList.toggle("on", x === b));
+  renderKinds(); load();
+});
+$("chipGeo").onclick = () => { state.geo = state.geo === "*" ? "Toàn quốc" : "*"; $("chipGeo").classList.toggle("on", state.geo !== "*"); $("chipGeo").setAttribute("aria-pressed", state.geo !== "*"); $("chipGeo").textContent = state.geo === "*" ? "Mọi địa bàn" : "Toàn quốc"; load(); };
+$("chipWarn").onclick = () => { state.warn = !state.warn; $("chipWarn").classList.toggle("on", state.warn); $("chipWarn").setAttribute("aria-pressed", state.warn); load(); };
+$("indicator").onchange = () => { state.indicator = $("indicator").value; load(); };
+
+// ---------- phím tắt ----------
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { closeDrawer(); return; }
+  if (e.target instanceof Element && e.target.matches("input:not([type=checkbox]), textarea, select")) return;
+  if (document.querySelector(".modal.on") || e.ctrlKey || e.metaKey) return;
+  const k = e.key.toLowerCase(), rows = $("rows").querySelectorAll("tr[data-i]");
+  if (!rows.length) return;
+  if (k === "j") { focusIdx = Math.min(items.length - 1, focusIdx + 1); renderFocus(); rows[focusIdx].scrollIntoView({ block: "nearest" }); }
+  else if (k === "k") { focusIdx = Math.max(0, focusIdx - 1); renderFocus(); rows[focusIdx].scrollIntoView({ block: "nearest" }); }
+  else if (k === "x") { const c = rows[focusIdx].querySelector(".cb"); c.checked = !c.checked; updateSel(); }
+  else if (k === "enter") openDrawer(items[focusIdx]);
+  else if (k === "a" && state.status !== "published") act(selectedIds().length ? selectedIds() : [items[focusIdx].id], "approve");
+  else if (k === "r" && state.status !== "rejected") act(selectedIds().length ? selectedIds() : [items[focusIdx].id], "reject");
+  else return;
+  e.preventDefault();
+});
+
+init().catch((e) => toast("Không tải được dữ liệu: " + e.message, { type: "err" }));
 </script>
 </body>
 </html>

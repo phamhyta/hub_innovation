@@ -43,6 +43,10 @@ def test_agency_source_wins_over_crawler(client, seeded):
     # công bố luôn số World Bank → năm 2023 có 2 nguồn cùng phân tổ; đơn vị chủ trì được ưu tiên
     wb = seeded.scalars(select(DataPoint).where(DataPoint.origin == "crawler:worldbank")).all()
     review_points(seeded, [p.id for p in wb], "approve", "A")
+    # File mẫu ghi "(giả lập)"; ở đây coi như báo cáo thật của đơn vị (số giả lập luôn thua số thật)
+    for p in seeded.scalars(select(DataPoint).where(DataPoint.origin.startswith("agency:"))):
+        p.is_simulated = False
+    seeded.commit()
     d = client.get("/api/indicators/0101/series").json()
     h = d["headline"]
     by_period = {p["period"]: p for p in h["series"]}

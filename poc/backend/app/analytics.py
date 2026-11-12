@@ -1,10 +1,12 @@
 """Tổng hợp dữ liệu ĐÃ CÔNG BỐ cho dashboard, trang chi tiết và báo cáo.
 
 Quy tắc chọn "giá trị chính thức" khi nhiều nguồn cùng có số cho một (chỉ tiêu, kỳ, phân tổ):
+  0. seed:*     – file tổng hợp của Cục (báo cáo 2244, bảng kết quả) – nguồn chính thức của PoC v2
   1. agency:*   – đơn vị được giao chủ trì báo cáo (nguồn chính thức theo QĐ 2244/3994)
   2. crawler:*  – nguồn công khai/quốc tế (ưu tiên tin cậy cao hơn)
   3. doc:*      – trích từ tài liệu
   4. calc:*     – chỉ số tự tính
+Giá trị tiêu biểu (headline) chỉ lấy số năm, không lấy dữ liệu minh hoạ (giả lập).
 Các nguồn còn lại vẫn hiển thị để đối chiếu, không bị ẩn.
 """
 
@@ -18,6 +20,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app import catalog as C
 from app.datapoints import NATIONAL
+from app.seed_import import SEED_PREFIX, SOURCE_LABEL, TOTAL
 from app.models import (
     AssignmentRole,
     CrawlRun,
@@ -37,7 +40,7 @@ MATRIX_YEARS = 8
 
 def origin_rank(origin: str, confidence: str | None = None) -> tuple:
     kind = origin.split(":", 1)[0]
-    order = {"agency": 0, "crawler": 1, "doc": 2, "calc": 3}.get(kind, 9)
+    order = {"seed": -1, "agency": 0, "crawler": 1, "doc": 2, "calc": 3}.get(kind, 9)
     return order, (confidence or "Z")[:1]
 
 
@@ -45,10 +48,58 @@ def lower_is_better(breakdown: str | None) -> bool:
     return bool(breakdown) and breakdown.lower().startswith("thứ hạng")
 
 
+CONNECTOR_LABEL = {"api_dinh": "API hệ thống thống kê (mô phỏng)"}
+
+
 def origin_label(origin: str) -> str:
     kind, _, rest = origin.partition(":")
+    if kind == "crawler" and rest in CONNECTOR_LABEL:
+        return CONNECTOR_LABEL[rest]
     return {"agency": rest, "crawler": f"Thu thập tự động ({rest})", "doc": f"Trích từ tài liệu #{rest}",
-            "calc": "Tự tính"}.get(kind, origin)
+            "calc": "Tự tính", "seed": SOURCE_LABEL.get(rest, "Số liệu tổng hợp của Cục")}.get(kind, origin)
+
+
+# Số của Cục từ báo cáo và từ bảng Excel được gộp thành một chuỗi khi hiển thị (ưu tiên báo cáo khi trùng kỳ)
+SEED_CUC = "seed:CUC"
+SEED_PRIORITY = ["seed:S_RPT", "seed:S_XLS"]
+
+
+def series_origin(origin: str) -> str:
+    return SEED_CUC if origin in SEED_PRIORITY else origin
+
+
+# Nguồn chỉ dùng để đối chiếu, không phải số thống kê chính thức của chỉ tiêu
+REFERENCE_ORIGINS = {"crawler:openalex"}
+
+
+def effective_data_status(p: DataPoint) -> str:
+    """Trạng thái dữ liệu hiển thị. Số của Cục mang trạng thái riêng; nguồn khác suy ra theo loại nguồn."""
+    if p.data_status:
+        return p.data_status
+    if p.is_simulated:
+        return "simulated"
+    if p.status != DataStatus.PUBLISHED:
+        return "under_review"
+    if p.origin.startswith("calc:"):
+        return "estimate"
+    if p.origin in REFERENCE_ORIGINS:
+        return "reference"
+    return "official"
+
+
+def headline_points(points: list[DataPoint]) -> list[DataPoint]:
+    """Điểm dùng cho giá trị tiêu biểu: chỉ số năm; bỏ số giả lập khi chỉ tiêu đã có số thật.
+
+    Chỉ tiêu chưa có số thật vẫn hiển thị số giả lập (kèm nhãn "Dữ liệu minh hoạ" trên giao diện).
+    """
+    annual = [p for p in points if (p.period_type or "Y") == "Y"]
+    if not annual:  # chỉ tiêu không có số năm (vd. bộ 137 theo tháng) → dùng loại kỳ mịn nhất hiện có
+        for t in ("Q", "M"):
+            annual = [p for p in points if p.period_type == t]
+            if annual:
+                break
+    real = [p for p in annual if not p.is_simulated]
+    return real or annual
 
 
 def _published(session: Session, indicator_ids=None, geography: str | None = NATIONAL) -> list[DataPoint]:
@@ -61,6 +112,10 @@ def _published(session: Session, indicator_ids=None, geography: str | None = NAT
 
 
 def headline_breakdown(code: str, points: list[DataPoint]) -> str | None:
+    points = headline_points(points)
+    seed = [p.breakdown for p in points if p.origin.startswith(SEED_PREFIX)]
+    if seed:  # số của Cục: ưu tiên dòng tổng
+        return TOTAL if TOTAL in seed else Counter(seed).most_common(1)[0][0]
     if code in C.HEADLINE and any(p.breakdown == C.HEADLINE[code] for p in points):
         return C.HEADLINE[code]
     raw = [p.breakdown for p in points if not p.origin.startswith("calc:")]
@@ -77,8 +132,9 @@ def best_by_period(points: list[DataPoint]) -> dict[str, DataPoint]:
 
 
 def _pt(p: DataPoint) -> dict:
-    return {"id": p.id, "period": p.period, "value": p.value, "unit": p.unit, "origin": p.origin,
-            "origin_label": origin_label(p.origin), "confidence": p.confidence}
+    return {"id": p.id, "period": p.period, "value": p.value, "value_text": p.value_text, "unit": p.unit,
+            "origin": p.origin, "origin_label": origin_label(p.origin), "confidence": p.confidence,
+            "data_status": effective_data_status(p), "is_simulated": bool(p.is_simulated)}
 
 
 @dataclass
@@ -92,12 +148,12 @@ class Headline:
         latest = self.series[periods[-1]] if periods else None
         prev = self.series[periods[-2]] if len(periods) > 1 else None
         change = None
-        if latest and prev and prev.value:
+        if latest and prev and prev.value and latest.value is not None:
             change = (latest.value / prev.value - 1) * 100
         lib = lower_is_better(self.breakdown)
         ind = self.indicator
         progress = None
-        if latest and ind.target_value:
+        if latest and latest.value is not None and ind.target_value:
             progress = (ind.target_value / latest.value if lib else latest.value / ind.target_value) * 100 \
                 if latest.value else None
         return {
@@ -125,7 +181,7 @@ def headlines(session: Session, framework: Framework = Framework.QD2244) -> list
         pts = by_ind.get(ind.id, [])
         bd = headline_breakdown(ind.code, pts)
         if bd:
-            out.append(Headline(ind, bd, best_by_period([p for p in pts if p.breakdown == bd])))
+            out.append(Headline(ind, bd, best_by_period([p for p in headline_points(pts) if p.breakdown == bd])))
     return out
 
 
@@ -137,20 +193,37 @@ def indicator_series(session: Session, ind: Indicator, geography: str = NATIONAL
     hb = headline_breakdown(ind.code, published)
     groups: dict[tuple, list[DataPoint]] = defaultdict(list)
     for p in points:
-        groups[(p.breakdown, p.origin)].append(p)
+        groups[(p.breakdown, series_origin(p.origin))].append(p)
     series = []
     for (bd, origin), pts in sorted(groups.items(), key=lambda kv: (kv[0][0] != hb, kv[0][0] or "",
                                                                      origin_rank(kv[0][1]))):
+        if origin == SEED_CUC:  # cùng kỳ có cả báo cáo và bảng Excel → lấy số báo cáo (quy ước file seed)
+            by_period: dict[str, DataPoint] = {}
+            for p in sorted(pts, key=lambda p: SEED_PRIORITY.index(p.origin) if p.origin in SEED_PRIORITY else 9,
+                            reverse=True):
+                by_period[p.period] = p
+            pts = list(by_period.values())
         pts.sort(key=lambda p: p.period)
         series.append({
             "breakdown": bd, "origin": origin, "origin_label": origin_label(origin),
             "unit": pts[-1].unit, "confidence": pts[-1].confidence, "derived": origin.startswith("calc:"),
             "lower_is_better": lower_is_better(bd),
-            "points": [{"id": p.id, "period": p.period, "value": p.value, "status": p.status.value,
+            "simulated": all(p.is_simulated for p in pts),
+            "points": [{"id": p.id, "period": p.period, "value": p.value, "value_text": p.value_text,
+                        "status": p.status.value, "data_status": effective_data_status(p),
+                        "is_simulated": bool(p.is_simulated), "period_type": p.period_type,
+                        "origin": p.origin, "origin_label": origin_label(p.origin),
                         "evidence_file_id": p.evidence_file_id, "excerpt": p.excerpt} for p in pts],
         })
-    headline = Headline(ind, hb, best_by_period([p for p in published if p.breakdown == hb])).as_dict() if hb else None
-    return {"code": ind.code, "name": ind.name, "headline_breakdown": hb, "headline": headline,
+    hp = [p for p in headline_points(published) if p.breakdown == hb]
+    # chỉ tiêu không có phân tổ (vd. bộ 137): dòng tổng mang breakdown = None
+    headline = Headline(ind, hb or "Tổng số", best_by_period(hp)).as_dict() if hp else None
+    return {"code": ind.code, "name": ind.name, "name_en": ind.name_en, "indicator_set": ind.indicator_set,
+            "data_status": ind.data_status, "stage": ind.stage, "frequency": ind.frequency,
+            "aggregation_rule": ind.aggregation_rule, "visibility": ind.visibility,
+            "lead_agency_text": ind.lead_agency_text, "latest_result_text": ind.latest_result_text,
+            "limitation": ind.limitation, "recommendation": ind.recommendation,
+            "headline_breakdown": hb, "headline": headline,
             "target_value": ind.target_value, "target_year": ind.target_year, "unit": ind.unit,
             "geographies": sorted({g for (g,) in session.execute(select(DataPoint.geography).where(
                 DataPoint.indicator_id == ind.id, DataPoint.is_current.is_(True)).distinct())}),
@@ -161,7 +234,8 @@ def overview(session: Session) -> dict:
     inds = session.scalars(select(Indicator).where(Indicator.primary_framework == Framework.QD2244)
                            .order_by(Indicator.id)).all()
     ids = [i.id for i in inds]
-    hl = {h.indicator.id: h for h in headlines(session)}
+    # chỉ tính chỉ tiêu có giá trị số (bỏ dòng chỉ có chữ như "Chưa tính được")
+    hl = {h.indicator.id: h for h in headlines(session) if any(p.value is not None for p in h.series.values())}
     current = session.scalars(select(DataPoint).where(DataPoint.is_current.is_(True),
                                                       DataPoint.indicator_id.in_(ids))).all()
     any_data = {p.indicator_id for p in current if p.status != DataStatus.REJECTED}
@@ -173,7 +247,7 @@ def overview(session: Session) -> dict:
         members = [i for i in inds if i.pillar == pl]
         pillars.append({"pillar": pl.value, "label": PILLAR_LABEL[pl], "total": len(members),
                         "published": sum(i.id in hl for i in members),
-                        "pending_only": sum(i.id in any_data and i.id not in hl for i in members)})
+                        "pending_only": sum(i.id in pending_by_ind and i.id not in hl for i in members)})
 
     # ma trận chỉ tiêu × năm (giá trị tiêu biểu đã công bố)
     years = sorted({int(p) for h in hl.values() for p in h.series if p.isdigit()})
@@ -222,7 +296,7 @@ def overview(session: Session) -> dict:
             "with_published": len(hl),
             "with_any_data": len(any_data),
             "pending_points": sum(pending_by_ind.values()),
-            "indicators_pending_only": len(any_data - set(hl)),
+            "indicators_pending_only": len(set(pending_by_ind) - set(hl)),
             "last_crawl_at": last_runs[0].started_at if last_runs else None,
         },
         "pillars": pillars,

@@ -34,6 +34,7 @@ class Framework(str, enum.Enum):
     QD3994 = "QD3994"  # Phân công của Bộ KH&CN theo QĐ 3994
     PROGRAM = "PROGRAM"  # 50 tiêu chí đánh giá chiến lược/chương trình
     PROPOSED = "PROPOSED"  # Tiêu chí do hệ thống đề xuất (Sprint 4)
+    STAT137 = "STAT137"  # Bộ 137 chỉ tiêu thống kê (qua API hệ thống thống kê)
 
 
 class Pillar(str, enum.Enum):
@@ -64,6 +65,23 @@ class DataStatus(str, enum.Enum):
     VERIFIED = "verified"
     REJECTED = "rejected"
     PUBLISHED = "published"
+
+
+class DataQuality(str, enum.Enum):
+    """Trạng thái dữ liệu theo phân loại của Cục (khác trạng thái duyệt DataStatus)."""
+
+    OFFICIAL = "official"  # chính thức
+    OFFICIAL_CAVEAT = "official_caveat"  # chính thức, có lưu ý
+    ESTIMATE = "estimate"  # ước tính
+    METHOD_ADJUSTMENT = "method_adjustment"  # điều chỉnh phương pháp
+    UPDATING = "updating"  # đang cập nhật
+    INCOMPLETE = "incomplete"  # chưa đầy đủ
+    UNDER_REVIEW = "under_review"  # đang rà soát
+    NOT_CALCULABLE = "not_calculable"  # chưa tính được
+    NOT_AVAILABLE = "not_available"  # chưa có số liệu
+    NO_INFO = "no_info"  # chưa có thông tin
+    REPORTED_UNVALIDATED = "reported_unvalidated"  # tỉnh tự báo cáo, chưa kiểm chứng
+    SIMULATED = "simulated"  # dữ liệu minh hoạ (giả lập)
 
 
 class SubmissionStatus(str, enum.Enum):
@@ -122,6 +140,21 @@ class Indicator(TimestampMixin, Base):
     confidence_best: Mapped[str | None] = mapped_column(String(1))  # mức tốt nhất, dùng lọc
     mvp_priority: Mapped[str | None] = mapped_column(String(8))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # Bộ chỉ tiêu và metadata theo file seed của Cục (dim_indicator)
+    indicator_set: Mapped[str | None] = mapped_column(String(16), index=True)  # 2244, 137, 39, L3, PROGRAM
+    name_en: Mapped[str | None] = mapped_column(Text)
+    stage: Mapped[str | None] = mapped_column(String(64))  # Đầu vào, Đầu ra/Kết quả, Kết quả/Hiệu quả, Tác động
+    aggregation_rule: Mapped[str | None] = mapped_column(String(8))  # sum | avg | last
+    visibility: Mapped[str] = mapped_column(String(16), default="public")  # public | internal
+    data_status: Mapped[str | None] = mapped_column(String(32))  # DataQuality của chỉ tiêu (kỳ mới nhất)
+    lead_agency_text: Mapped[str | None] = mapped_column(String(255))
+    latest_result_text: Mapped[str | None] = mapped_column(Text)
+    limitation: Mapped[str | None] = mapped_column(Text)
+    recommendation: Mapped[str | None] = mapped_column(Text)
+    recommended_chart: Mapped[str | None] = mapped_column(String(255))
+    readiness_report: Mapped[str | None] = mapped_column(String(128))
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("indicators.id"))
 
     framework_entries: Mapped[list[FrameworkEntry]] = relationship(
         back_populates="indicator", cascade="all, delete-orphan", order_by="FrameworkEntry.framework"
@@ -274,9 +307,15 @@ class DataPoint(TimestampMixin, Base):
     excerpt: Mapped[str | None] = mapped_column(Text)  # đoạn trích nguồn để người duyệt đối chiếu
     confidence: Mapped[str | None] = mapped_column(String(8))
     status: Mapped[DataStatus] = mapped_column(_enum(DataStatus), default=DataStatus.COLLECTED, index=True)
-    extracted_by: Mapped[str | None] = mapped_column(String(32))  # crawler, upload, docetl, calc
+    extracted_by: Mapped[str | None] = mapped_column(String(32))  # crawler, upload, docetl, calc, seed
     warnings: Mapped[list] = mapped_column(JSON, default=list)
     meta: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Trạng thái dữ liệu theo Cục (DataQuality); None = suy ra từ nguồn, xem analytics.effective_data_status
+    data_status: Mapped[str | None] = mapped_column(String(32))
+    is_simulated: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    period_type: Mapped[str] = mapped_column(String(1), default="Y")  # M | Q | Y
+    region_code: Mapped[str] = mapped_column(String(8), default="VN", index=True)
+    release_id: Mapped[int | None] = mapped_column(ForeignKey("data_releases.id"))
 
     indicator: Mapped[Indicator] = relationship()
     source: Mapped[Source | None] = relationship()
@@ -399,3 +438,173 @@ class CriteriaSuggestion(TimestampMixin, Base):
     status: Mapped[SuggestionStatus] = mapped_column(_enum(SuggestionStatus), default=SuggestionStatus.PROPOSED)
     reviewer_note: Mapped[str | None] = mapped_column(Text)
     accepted_indicator_id: Mapped[int | None] = mapped_column(ForeignKey("indicators.id"))
+
+
+# ---------------------------------------------------------------- dữ liệu chuẩn của Cục (PoC v2 – file seed)
+class Region(Base):
+    """34 tỉnh, thành phố và toàn quốc (mã VN)."""
+
+    __tablename__ = "regions"
+
+    code: Mapped[str] = mapped_column(String(8), primary_key=True)
+    name_vi: Mapped[str] = mapped_column(String(128))
+    name_en: Mapped[str | None] = mapped_column(String(128))
+    reported_2025: Mapped[bool | None] = mapped_column(Boolean)
+
+
+class DataRelease(Base):
+    """Một lần nhập file tổng hợp (file seed / file Excel của Cục)."""
+
+    __tablename__ = "data_releases"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    file_name: Mapped[str] = mapped_column(String(512))
+    sha256: Mapped[str] = mapped_column(String(64), index=True)
+    imported_by: Mapped[str | None] = mapped_column(String(255))
+    stats: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class IndicatorMapping(Base):
+    """Ánh xạ chỉ tiêu trùng giữa 2244 và 137 (dữ liệu lưu một lần, 2244 tính lại từ 137)."""
+
+    __tablename__ = "indicator_mappings"
+    __table_args__ = (UniqueConstraint("code_2244", "code_137"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code_2244: Mapped[str] = mapped_column(String(32))
+    code_137: Mapped[str] = mapped_column(String(32))
+    relation: Mapped[str] = mapped_column(String(16), default="identical")  # identical | derived | related
+    rule: Mapped[str | None] = mapped_column(String(128))
+    is_simulated: Mapped[bool] = mapped_column(Boolean, default=False)
+    note: Mapped[str | None] = mapped_column(Text)
+
+
+class ReadinessScore(Base):
+    """Mức sẵn sàng dữ liệu: chỉ tiêu × 8 chiều chất lượng (0 = không đủ, 1 = một phần, 2 = đạt)."""
+
+    __tablename__ = "readiness_scores"
+    __table_args__ = (UniqueConstraint("indicator_code", "dimension"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    indicator_code: Mapped[str] = mapped_column(String(32), index=True)
+    dimension: Mapped[str] = mapped_column(String(64))
+    level: Mapped[str | None] = mapped_column(String(32))
+    level_vi: Mapped[str | None] = mapped_column(String(32))
+    score: Mapped[int | None] = mapped_column(Integer)
+
+
+class ChartSeries(Base):
+    """Dữ liệu dựng lại các hình/bảng của báo cáo 2244 (sheet chart_data)."""
+
+    __tablename__ = "chart_series"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    chart_id: Mapped[str] = mapped_column(String(64), index=True)
+    figure_ref: Mapped[str | None] = mapped_column(String(64))
+    title_vi: Mapped[str | None] = mapped_column(String(255))
+    series: Mapped[str | None] = mapped_column(String(128))
+    category: Mapped[str | None] = mapped_column(String(255))
+    value: Mapped[float | None] = mapped_column(Float)
+    unit: Mapped[str | None] = mapped_column(String(64))
+    note: Mapped[str | None] = mapped_column(Text)
+    order_no: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class KpiCard(Base):
+    __tablename__ = "kpi_cards"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_no: Mapped[int] = mapped_column(Integer, default=0)
+    title: Mapped[str] = mapped_column(String(255))
+    value_display: Mapped[str] = mapped_column(String(255))
+    context: Mapped[str | None] = mapped_column(String(255))
+    indicator_code: Mapped[str | None] = mapped_column(String(32))
+    data_status: Mapped[str | None] = mapped_column(String(32))
+    message: Mapped[str | None] = mapped_column(Text)
+
+
+class ScorecardRow(Base):
+    __tablename__ = "scorecard_rows"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_no: Mapped[int] = mapped_column(Integer, default=0)
+    dimension: Mapped[str] = mapped_column(String(128))
+    diagnosis: Mapped[str | None] = mapped_column(Text)
+    evidence_status: Mapped[str | None] = mapped_column(Text)
+    policy_implication: Mapped[str | None] = mapped_column(Text)
+
+
+class StatusSummary(Base):
+    __tablename__ = "status_summary"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_no: Mapped[int] = mapped_column(Integer, default=0)
+    classification: Mapped[str] = mapped_column(String(128))
+    status: Mapped[str] = mapped_column(String(128))
+    count: Mapped[int] = mapped_column(Integer)
+    share_pct: Mapped[float | None] = mapped_column(Float)
+
+
+class ProvincialCoverage(Base):
+    __tablename__ = "provincial_coverage"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    indicator_code: Mapped[str] = mapped_column(String(32), unique=True)
+    indicator_en: Mapped[str | None] = mapped_column(String(255))
+    provinces_reporting: Mapped[int | None] = mapped_column(Integer)
+    provinces_total: Mapped[int | None] = mapped_column(Integer)
+    reporting_text: Mapped[str | None] = mapped_column(String(64))
+    usable_coverage: Mapped[str | None] = mapped_column(String(64))
+    main_issue: Mapped[str | None] = mapped_column(Text)
+
+
+class Reconciliation(Base):
+    """Chênh lệch giữa file Excel của Cục và báo cáo – chờ Cục xác nhận."""
+
+    __tablename__ = "reconciliations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    indicator_code: Mapped[str] = mapped_column(String(32), unique=True)
+    value_excel: Mapped[float | None] = mapped_column(Float)
+    value_report: Mapped[float | None] = mapped_column(Float)
+    unit: Mapped[str | None] = mapped_column(String(64))
+    diff_pct: Mapped[float | None] = mapped_column(Float)
+    explanation: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str | None] = mapped_column(String(64))
+    confirmed_by: Mapped[str | None] = mapped_column(String(255))
+    confirmed_note: Mapped[str | None] = mapped_column(Text)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class Narrative(Base):
+    """Đoạn văn bản biên tập (vd. "Phát hiện chính"), theo mục và ngôn ngữ."""
+
+    __tablename__ = "narratives"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    section: Mapped[str] = mapped_column(String(64), index=True)
+    order_no: Mapped[int] = mapped_column(Integer, default=0)
+    lang: Mapped[str] = mapped_column(String(4), default="vi")
+    title: Mapped[str | None] = mapped_column(String(255))
+    text: Mapped[str] = mapped_column(Text)
+    published: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class AuditEvent(Base):
+    """Nhật ký thao tác quản trị (GĐ 5): sửa giá trị, đổi cờ hiển thị, ánh xạ, nhập file, đăng nhập…
+
+    Thao tác duyệt từng số liệu vẫn ghi ở review_logs; trang Nhật ký gộp cả hai nguồn.
+    """
+
+    __tablename__ = "audit_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    actor: Mapped[str] = mapped_column(String(255), index=True)
+    role: Mapped[str | None] = mapped_column(String(16))
+    action: Mapped[str] = mapped_column(String(64), index=True)
+    target: Mapped[str | None] = mapped_column(String(255))
+    indicator_code: Mapped[str | None] = mapped_column(String(32), index=True)
+    detail: Mapped[dict] = mapped_column(JSON, default=dict)
+    reason: Mapped[str | None] = mapped_column(Text)

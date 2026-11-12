@@ -65,6 +65,10 @@ class IndicatorSummary(BaseModel):
     lead_agencies: list[str]
     alias_codes: list[str]
     source_count: int
+    indicator_set: str | None = None
+    name_en: str | None = None
+    data_status: str | None = None
+    visibility: str = "public"
 
 
 class IndicatorDetail(IndicatorSummary):
@@ -89,6 +93,10 @@ class IndicatorUpdate(BaseModel):
     frequency: str | None = Field(default=None, max_length=32)
     target_value: float | None = None
     target_year: int | None = Field(default=None, ge=2000, le=2100)
+    # GĐ 5 – quản trị: cờ hiển thị và trạng thái dữ liệu theo Cục
+    visibility: str | None = Field(default=None, pattern="^(public|internal)$")
+    data_status: str | None = Field(default=None, max_length=32)
+    reason: str | None = Field(default=None, max_length=2000)
 
 
 class AgencyOut(AgencyRef):

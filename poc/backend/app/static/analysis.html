@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phân tích – Dữ liệu Đổi mới sáng tạo</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/common.js"></script>
+<script src="/static/illus.js"></script>
+<script src="/static/charts.js"></script>
+<style>
+  .ctl { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-bottom: 4px; position: sticky; top: 60px; z-index: 10; padding: 8px 0; background: linear-gradient(var(--bg) 80%, transparent); }
+  .ctl .cnt { font-size: 12.5px; color: var(--text-3); }
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  @media (max-width: 1100px) { .grid2 { grid-template-columns: 1fr; } }
+  .viz { display: flex; flex-direction: column; gap: 12px; min-width: 0; scroll-margin-top: 120px; }
+  .viz.wide { grid-column: 1 / -1; }
+  .viz h3 { margin: 0; font-size: 15.5px; line-height: 1.4; letter-spacing: -.01em; }
+  .viz .sub { font-size: 12.5px; color: var(--text-3); margin-top: 3px; }
+  .viz .body { min-width: 0; }
+  .viz .facets { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px 24px; }
+  .viz .facets h4 { margin: 0 0 8px; font-size: 12.5px; color: var(--text-2); }
+  .viz footer { margin-top: auto; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 10px; }
+  .viz .src { font-size: 12px; color: var(--text-3); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+  .viz .src a.tag { height: 20px; font-size: 11px; }
+  .viz .acts { display: flex; gap: 6px; margin-left: auto; }
+  .viz .notes { font-size: 12px; color: var(--text-2); display: flex; gap: 6px; align-items: flex-start; background: var(--surface-2); border-radius: 8px; padding: 6px 10px; }
+  .viz .notes svg { flex: none; margin-top: 2px; width: 15px; height: 15px; color: var(--text-3); }
+  .viz .tbl table { font-size: 12.5px; }
+  .viz .tbl td.num { font-variant-numeric: tabular-nums; }
+  .pgroup { display: flex; align-items: baseline; gap: 10px; }
+  .pgroup span { font-size: 12.5px; color: var(--text-3); font-weight: 500; }
+</style>
+</head>
+<body>
+<main>
+  <div class="ctl"><span id="fWrap"></span><span class="cnt" id="cnt"></span></div>
+  <div id="charts"></div>
+  <p class="small muted">Biểu đồ dựng lại từ số liệu trong file tổng hợp của Cục (sheet chart_data). Tiêu đề mỗi biểu đồ được tính từ số liệu; khi Cục cập nhật file, nội dung thay đổi theo.</p>
+</main>
+<script>
+renderHeader("/analysis");
+const PILLAR = { input: "Đầu vào", output: "Đầu ra", efficiency: "Hiệu quả", impact: "Tác động", other: "Khác" };
+const PILLAR_DESC = { input: "Nguồn lực: nhân lực, đầu tư", output: "Công bố, sở hữu trí tuệ, chuyển giao", efficiency: "Đóng góp vào tăng trưởng, năng suất", impact: "Kinh tế số, cơ cấu, năng lượng, chính phủ số" };
+const SVG_KINDS = new Set(["column", "stack", "line", "slope", "bubble"]);
+const WIDE = new Set(["C_DIGITAL_GOV_CHAIN"]);
+let charts = [], filter = new URLSearchParams(location.search).get("pillar") || "";
+
+const uniq = (a) => [...new Set(a)];
+const bySeries = (rows) => { const m = new Map(); rows.forEach((r) => { if (!m.has(r.series)) m.set(r.series, []); m.get(r.series).push(r); }); return m; };
+const unitOf = (r, c) => r.unit && r.unit !== "hỗn hợp" ? r.unit : splitUnit(r.category)[1];
+
+function draw(c, box) {
+  const rows = c.rows, u = c.unit === "hỗn hợp" ? "" : c.unit;
+  switch (c.kind) {
+    case "hbar": {
+      const total = rows.reduce((a, r) => a + (r.value || 0), 0);
+      return hbarChart(box, { rows: rows.map((r) => ({ label: r.category, value: r.value, share: r.value / total * 100 })), unit: u });
+    }
+    case "hbar_facet": case "dot_facet": {
+      const groups = [...bySeries(rows)];
+      const cats = uniq(rows.map((r) => r.category));
+      box.innerHTML = `<div class="facets">${groups.map((_, i) => `<div><h4>${esc(groups[i][0])}</h4><div id="${box.id}f${i}"></div></div>`).join("")}</div>`;
+      return groups.forEach(([name, rs], i) => {
+        const f = $(`${box.id}f${i}`), fu = splitUnit(name)[1] || u;
+        if (c.kind === "hbar_facet")
+          hbarChart(f, { rows: cats.map((k) => ({ label: k, value: (rs.find((r) => r.category === k) || {}).value ?? null })), unit: fu, sort: false, keepEmpty: true });
+        else dotPlot(f, { rows: rs.map((r) => r.category), series: [{ name, values: rs.map((r) => r.value) }], unit: fu, highlight: "Việt Nam" });
+      });
+    }
+    case "dot": {
+      const groups = [...bySeries(rows)], cats = uniq(rows.map((r) => r.category));
+      return dotPlot(box, { rows: cats, series: groups.map(([name, rs]) => ({ name, values: cats.map((k) => (rs.find((r) => r.category === k) || {}).value ?? null) })),
+        unit: u, highlight: groups.length === 1 ? "Việt Nam" : null });
+    }
+    case "tiles":
+      return statTiles(box, rows.map((r) => { const [label] = splitUnit(r.category); return { label, value: r.value, unit: unitOf(r, c), sub: label.includes(r.series) ? "" : r.series }; }));
+    case "contrast": {
+      const groups = [...bySeries(rows)];
+      box.innerHTML = `<div class="facets">${groups.map((_, i) => `<div id="${box.id}f${i}"></div>`).join("")}</div>`;
+      return groups.forEach(([name, rs], i) => statTiles($(`${box.id}f${i}`), rs.map((r) => { const [label, ru] = splitUnit(r.category); return { label, value: r.value, unit: ru }; }), { heading: name }));
+    }
+    case "column":
+      return columnChart(box, { cats: rows.map((r) => r.category), series: [{ name: rows[0].series, values: rows.map((r) => r.value) }], unit: u, label: c.title });
+    case "stack": {
+      const cats = uniq(rows.map((r) => r.category)), g = [...bySeries(rows)];
+      const val = (rs, k) => (rs.find((r) => r.category === k) || {}).value ?? null;
+      const parts = g.filter(([n]) => !/^Tổng/.test(n)), tot = g.find(([n]) => /^Tổng/.test(n));
+      return columnChart(box, { cats, stacked: true, unit: u, label: c.title, height: 260,
+        series: parts.map(([name, rs]) => ({ name, values: cats.map((k) => val(rs, k)) })),
+        total: tot ? { name: tot[0], values: cats.map((k) => val(tot[1], k)) } : null });
+    }
+    case "segbar":
+      return segBar(box, { parts: rows.map((r) => ({ label: r.category, value: r.value })), unit: u });
+    case "part": {
+      const [a, t] = rows;
+      segBar(box, { parts: [{ label: a.category, value: a.value }, { label: "Nguồn khác", value: t.value - a.value, neutral: true }], unit: u });
+      return box.insertAdjacentHTML("beforeend", `<div class="small muted" style="margin-top:6px">${esc(t.category)}: ${fmtNum(t.value, 3)} ${esc(u)}</div>`);
+    }
+    case "line":
+      return lineChart(box, { series: [...bySeries(rows)].map(([name, rs]) => ({ name, points: rs.map((r) => ({ x: String(r.category), y: r.value })) })), unit: u, height: 220 });
+    case "slope": {
+      const g = [...bySeries(rows)], first = g[0][1];
+      return slopeChart(box, { from: first[0].category, to: first[first.length - 1].category, unit: u,
+        series: g.map(([name, rs]) => ({ name, a: rs[0].value, b: rs[rs.length - 1].value })) });
+    }
+    case "bubble": {
+      const g = [...bySeries(rows)], pick = (rs, k) => rs.find((r) => r.category.includes(k)) || {};
+      const lab = (k) => pick(g[0][1], k).category || k;
+      return bubbleChart(box, { xLabel: lab("GDP"), yLabel: lab("Điện"), rLabel: lab("Phát thải"),
+        points: g.map(([name, rs]) => ({ name, x: pick(rs, "GDP").value, y: pick(rs, "Điện").value, r: pick(rs, "Phát thải").value })) });
+    }
+    case "chain": {
+      const g = [...bySeries(rows)];
+      const steps = g.length === 1 ? rows.map((r) => ({ label: splitUnit(r.category)[0], items: [{ label: r.category, value: r.value }] }))
+        : g.map(([name, rs]) => ({ label: name, items: rs.map((r) => ({ label: r.category, value: r.value })) }));
+      return chainFlow(box, { steps });
+    }
+    case "rank": {
+      const idx = new Map();
+      rows.forEach((r) => {
+        const m = String(r.category).match(/^(.*?)\s*\(\/(\d+)\)\s*$/), name = m ? m[1] : r.category;
+        const x = idx.get(name) || { name };
+        if (r.series === "Hạng") { x.rank = r.value; x.total = m ? +m[2] : null; } else x.score = r.value;
+        idx.set(name, x);
+      });
+      return rankTiles(box, [...idx.values()]);
+    }
+    default:
+      box.innerHTML = c.available ? "" : `<div class="emptybox">${emptyState("Chưa tính được – chưa đủ số liệu để vẽ", "clock")}</div>`;
+      if (c.available) toggleTable(c, true);
+  }
+}
+
+function tableHtml(c) {
+  return `<div class="table-wrap"><table><thead><tr><th>Chuỗi</th><th>Hạng mục</th><th class="num">Giá trị</th><th>Đơn vị</th></tr></thead><tbody>${c.rows.map((r) =>
+    `<tr><td>${esc(r.series ?? "")}</td><td>${esc(r.category ?? "")}</td><td class="num">${r.value == null ? "–" : fmt(r.value, 4)}</td><td class="small">${esc(r.unit || "")}</td></tr>`).join("")}</tbody></table></div>`;
+}
+function toggleTable(c, force) {
+  const card = $(c.chart_id), t = card.querySelector(".tbl"), b = card.querySelector("[data-act=tbl]");
+  const on = force ?? t.hidden;
+  t.hidden = !on; if (on && !t.innerHTML) t.innerHTML = tableHtml(c);
+  b.setAttribute("aria-pressed", on); b.innerHTML = ic(on ? "chart" : "table") + (on ? "Ẩn bảng" : "Bảng số liệu");
+}
+
+function cardHtml(c) {
+  return `<article class="card viz ${WIDE.has(c.chart_id) ? "wide" : ""}" id="${esc(c.chart_id)}">
+    <header><h3>${esc(c.message)}</h3><div class="sub">${esc(c.title)}${c.unit ? ` · Đơn vị: ${esc(c.unit)}` : ""}</div></header>
+    <div class="body" id="b_${esc(c.chart_id)}"></div>
+    ${c.notes.length ? `<div class="notes">${ic("info")}<span>${c.notes.map(esc).join(" · ")}</span></div>` : ""}
+    <div class="tbl" hidden></div>
+    <footer><div class="src">Nguồn: ${esc(c.source)}${c.indicators.map((i) => `<a class="tag" href="/indicator?code=${encodeURIComponent(i.code)}" title="${esc(i.name || "")}">${esc(i.code)}</a>`).join("")}</div>
+      <div class="acts"><button class="btn sm" data-act="tbl" aria-pressed="false">${ic("table")}Bảng số liệu</button><button class="btn sm" data-act="csv">${ic("download")}CSV</button></div></footer>
+  </article>`;
+}
+
+function render() {
+  const list = charts.filter((c) => !filter || c.pillar === filter);
+  const groups = uniq(list.map((c) => c.pillar));
+  $("cnt").textContent = `${list.length} biểu đồ`;
+  $("charts").innerHTML = groups.map((p) => `<h2 class="section pgroup">${esc(PILLAR[p] || p)}<span>${esc(PILLAR_DESC[p] || "")}</span></h2>
+    <div class="grid2">${list.filter((c) => c.pillar === p).map(cardHtml).join("")}</div>`).join("") || emptyState("Chưa có dữ liệu biểu đồ", "chart");
+  list.forEach((c) => {
+    const card = $(c.chart_id);
+    card.querySelector("[data-act=tbl]").onclick = () => toggleTable(c);
+    card.querySelector("[data-act=csv]").onclick = () => downloadCsv(`${c.chart_id}.csv`, ["chart_id", "figure_ref", "series", "category", "value", "unit", "note"],
+      c.rows.map((r) => [c.chart_id, c.figure_ref, r.series, r.category, r.value, r.unit, r.note]));
+    try { draw(c, $("b_" + c.chart_id)); } catch (e) { console.error(c.chart_id, e); $("b_" + c.chart_id).innerHTML = ""; toggleTable(c, true); }
+  });
+}
+
+$("fWrap").innerHTML = segHtml("pf", [["", "Tất cả"], ["input", "Đầu vào"], ["output", "Đầu ra"], ["efficiency", "Hiệu quả"], ["impact", "Tác động"]], filter, "Lọc theo nhóm");
+onSeg("pf", (v) => { filter = v; history.replaceState(null, "", v ? `?pillar=${v}` : location.pathname); render(); });
+
+let lastW = 0, rt;
+addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => {
+  if (Math.abs(innerWidth - lastW) < 40) return; lastW = innerWidth;
+  charts.filter((c) => SVG_KINDS.has(c.kind) && $("b_" + c.chart_id)).forEach((c) => draw(c, $("b_" + c.chart_id)));
+}, 200); });
+
+api("/api/charts").then((d) => {
+  charts = d.items; lastW = innerWidth; render();
+  if (location.hash) { const t = document.querySelector(location.hash); t && t.scrollIntoView(); }
+}).catch((e) => toast("Không tải được dữ liệu: " + e.message, { type: "err" }));
+</script>
+</body>
+</html>

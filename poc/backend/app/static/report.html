@@ -6,6 +6,7 @@
 <title>Báo cáo chỉ tiêu KH,CN, ĐMST &amp; CĐS</title>
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/common.js"></script>
+<script src="/static/illus.js"></script>
 <style>
   .doc { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 28px 32px; }
   .doc h1 { font-size: 20px; margin: 0 0 4px; text-align: center; }
@@ -17,8 +18,8 @@
 <body>
 <main>
   <div class="filters no-print" style="justify-content:space-between">
-    <a href="/">← Tổng quan</a>
-    <div><button class="btn primary" onclick="print()">🖨 In / Lưu PDF</button> <a class="btn" id="xlsx">⬇ Excel</a></div>
+    <div><h1 style="margin:0;font-size:28px;letter-spacing:-.02em">Báo cáo</h1><div class="muted">Xem trước · in · tải Excel</div></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap"><select class="field" id="yearSel" aria-label="Kỳ báo cáo"></select><a class="btn" id="xlsx"></a><button class="btn primary" id="printBtn" onclick="print()"></button></div>
   </div>
   <div class="doc">
     <h1>BÁO CÁO TÌNH HÌNH THỰC HIỆN CHỈ TIÊU KH,CN, ĐMST &amp; CĐS</h1>
@@ -37,10 +38,13 @@
   </div>
 </main>
 <script>
-renderHeader("/");
+renderHeader("/report");
 const year = Number(new URLSearchParams(location.search).get("year")) || new Date().getFullYear() - 1;
 const years = [0, 1, 2, 3, 4].map((i) => String(year - 4 + i));
 $("xlsx").href = `/api/reports/indicators.xlsx?year=${year}`;
+$("xlsx").innerHTML = ic("download") + "Excel"; $("printBtn").innerHTML = ic("printer") + "In / PDF";
+$("yearSel").innerHTML = [0, 1, 2, 3].map((i) => new Date().getFullYear() - i).map((y) => `<option ${y === year ? "selected" : ""}>${y}</option>`).join("");
+$("yearSel").onchange = () => { location.search = "?year=" + $("yearSel").value; };
 (async () => {
   const d = await api("/api/dashboard");
   const k = d.kpis;

@@ -3,41 +3,42 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Innovation Hub – Đánh giá case</title>
+<title>Đánh giá chương trình – Dữ liệu Đổi mới sáng tạo</title>
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/common.js"></script>
+<script src="/static/illus.js"></script>
 </head>
 <body>
 <main>
-  <p class="muted">Đánh giá một chương trình/nhiệm vụ KH&amp;CN theo 50 tiêu chí đánh giá chương trình. Công bố quốc tế và h-index được tính tự động từ OpenAlex; văn bằng SHTT kê khai; TRL do hội đồng chấm; các tiêu chí khác nhập kèm minh chứng.</p>
+  <a class="btn primary ph-actions" href="#f" id="newBtn">Tạo mới</a>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>#</th><th>Case</th><th>Giai đoạn</th><th class="num">Điểm</th><th>Kết luận</th><th class="num">Tiêu chí có điểm</th></tr></thead>
+      <thead><tr><th>#</th><th>Chương trình</th><th>Giai đoạn</th><th class="num">Điểm</th><th>Kết luận</th><th class="num">Tiêu chí có điểm</th></tr></thead>
       <tbody id="rows"></tbody>
     </table>
   </div>
 
-  <h2 class="section">Tạo case mới</h2>
+  <h2 class="section">Tạo hồ sơ đánh giá</h2>
   <form id="f" class="card edit">
-    <label class="full">Tên chương trình/nhiệm vụ<input class="field" name="name" required minlength="3"></label>
-    <label class="full">Mô tả / tóm tắt kết quả (dùng để gợi ý mức TRL)<textarea class="field" name="description" rows="3"></textarea></label>
+    <label class="full">Tên chương trình<input class="field" name="name" required minlength="3"></label>
+    <label class="full">Tóm tắt kết quả<textarea class="field" name="description" rows="3" placeholder="Dùng để gợi ý mức TRL"></textarea></label>
     <label>Từ năm<input class="field" name="year_from" type="number" min="1990" max="2100"></label>
     <label>Đến năm<input class="field" name="year_to" type="number" min="1990" max="2100"></label>
-    <label>Kinh phí được cấp (tỷ đồng)<input class="field" name="budget_billion_vnd" type="number" step="any" min="0"></label>
+    <label>Kinh phí (tỷ đồng)<input class="field" name="budget_billion_vnd" type="number" step="any" min="0"></label>
     <label>&nbsp;</label>
-    <label class="full">DOI các bài báo kê khai (mỗi dòng một DOI)<textarea class="field" name="dois" rows="4" placeholder="10.1016/j.xxx.2023.01.001"></textarea></label>
-    <label class="full">Mã tác giả OpenAlex của nhóm nghiên cứu (A…, mỗi dòng một mã) – dùng cho h-index<textarea class="field" name="author_ids" rows="2" placeholder="A5012345678"></textarea></label>
-    <label class="full">Văn bằng SHTT kê khai (mỗi dòng: <code>số đơn/bằng | SC hoặc HI | filed/accepted/granted | tên</code>)<textarea class="field" name="patents" rows="2" placeholder="1-2024-01234 | SC | accepted | Quy trình ..."></textarea></label>
-    <div class="full small muted">Mục tiêu đăng ký (để trống = dùng mức chuẩn mặc định)</div>
+    <label class="full">DOI bài báo<textarea class="field" name="dois" rows="4" placeholder="Mỗi dòng một DOI, vd. 10.1016/j.xxx.2023.01.001"></textarea></label>
+    <label class="full">Tác giả OpenAlex<textarea class="field" name="author_ids" rows="2" placeholder="Mỗi dòng một mã A…, dùng tính h-index"></textarea></label>
+    <label class="full">Văn bằng SHTT<textarea class="field" name="patents" rows="2" placeholder="số | SC/HI | filed/accepted/granted | tên"></textarea></label>
+    <div class="full small muted">Mục tiêu (để trống = mặc định)</div>
     <label>Số bài quốc tế<input class="field" name="t_articles" type="number" step="any"></label>
-    <label>Tỷ lệ hợp tác quốc tế (%)<input class="field" name="t_intl_collab_pct" type="number" step="any"></label>
+    <label>Hợp tác quốc tế (%)<input class="field" name="t_intl_collab_pct" type="number" step="any"></label>
     <label>Trích dẫn TB/bài<input class="field" name="t_citations_per_article" type="number" step="any"></label>
     <label>H-index trung vị<input class="field" name="t_h_index" type="number" step="any"></label>
-    <label>Kinh phí tối đa/bài (tỷ đồng)<input class="field" name="t_budget_per_article" type="number" step="any"></label>
+    <label>Kinh phí/bài tối đa<input class="field" name="t_budget_per_article" type="number" step="any"></label>
     <label>TRL mục tiêu<input class="field" name="t_trl" type="number" min="1" max="9"></label>
-    <label>Đơn SHTT được chấp nhận<input class="field" name="t_patent_applications" type="number"></label>
+    <label>Đơn SHTT<input class="field" name="t_patent_applications" type="number"></label>
     <label>Văn bằng được cấp<input class="field" name="t_patents_granted" type="number"></label>
-    <div class="full"><button class="btn primary">Tạo case</button> <span id="msg" class="small"></span></div>
+    <div class="full"><button class="btn primary">Tạo hồ sơ</button> <span id="msg" class="small"></span></div>
   </form>
 </main>
 <script>
@@ -50,7 +51,7 @@ async function load() {
     <td class="num"><b>${c.overall != null ? c.overall.toFixed(1) : "–"}</b></td>
     <td>${esc(c.verdict)}${c.provisional ? ' <span class="status st-needs_review">tạm tính</span>' : ""}</td>
     <td class="num">${c.coverage.scored}/${c.coverage.total}</td></tr>`).join("")
-    || '<tr><td colspan="6" class="muted">Chưa có case. Chạy <code>uv run python -m scripts.create_demo_case</code> để tạo case demo, hoặc tạo bên dưới.</td></tr>';
+    || '<tr><td colspan="6" class="muted">Chưa có hồ sơ đánh giá. Tạo hồ sơ mới ở phần bên dưới.</td></tr>';
 }
 
 $("f").addEventListener("submit", async (e) => {

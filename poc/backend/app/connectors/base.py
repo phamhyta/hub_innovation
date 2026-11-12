@@ -41,10 +41,19 @@ class Connector:
     confidence: str = "B"
     schedule_cron: str = "0 3 * * mon"  # 3h sáng thứ Hai hằng tuần (dùng tên ngày, tránh lệch số giữa cron/APScheduler)
     description: str = ""
+    simulated: bool = False  # nguồn mô phỏng → số liệu gắn cờ "Dữ liệu minh hoạ"
+    requires_network: bool = True
 
     @property
     def auto_publish(self) -> bool:
         return self.confidence == "A"
+
+    def prepare(self, session, docs: list[Fetched]) -> None:
+        """Chuẩn bị trước khi ghi số liệu (vd. đăng ký chỉ tiêu mới). Mặc định không làm gì."""
+
+    def after_run(self, session, touched: set[str]) -> dict:
+        """Xử lý sau khi ghi số liệu (vd. tính lại chỉ tiêu liên quan). Trả về thống kê bổ sung."""
+        return {}
 
     def fetch(self, http: httpx.Client) -> list[Fetched]:
         raise NotImplementedError

@@ -19,3 +19,4 @@ poc/data/import_report.json
 # Tài liệu gốc của khách hàng ở thư mục gốc (bản dùng cho app nằm ở poc/data/raw)
 /Tài liệu mô tả.docx
 /indicator_survey.xlsx
+!.env.example

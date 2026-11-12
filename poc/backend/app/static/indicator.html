@@ -3,18 +3,62 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Innovation Hub – Chi tiết chỉ tiêu</title>
+<title>Chi tiết chỉ tiêu – Dữ liệu Đổi mới sáng tạo</title>
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/common.js"></script>
+<script src="/static/illus.js"></script>
 <script src="/static/charts.js"></script>
+<style>
+  .info2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; margin-top: 14px; }
+  .info2 > * { min-width: 0; }
+  .info2 h3 { margin: 0 0 8px; font-size: 15px; }
+  .annex dl { margin: 0; display: grid; grid-template-columns: 120px 1fr; gap: 8px 14px; font-size: 13.5px; }
+  .annex dt { color: var(--text-3); font-weight: 600; }
+  .annex dd { margin: 0; color: var(--text-2); line-height: 1.5; }
+  .annex .note { margin-top: 10px; font-size: 12px; color: var(--text-3); }
+  .ready { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .ready .cell { border-radius: 8px; padding: 8px 9px; font-size: 12px; line-height: 1.3; display: flex; flex-direction: column; gap: 2px; height: auto; align-items: flex-start; white-space: normal; }
+  .ready .cell b { font-size: 12px; color: var(--text); font-weight: 600; }
+  .chart-ctl { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; }
+  .chart-ctl label { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
+  .chart-ctl select { min-width: 0; max-width: min(520px, 100%); }
+  @media (max-width: 600px) { .chart-ctl label { width: 100%; } .chart-ctl select { flex: 1; width: 100%; } }
+  .tbl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .ts-head { display: flex; justify-content: space-between; align-items: center; gap: 10px 14px; flex-wrap: wrap; margin-bottom: 12px; }
+  .ts-head h3, .card > h3.h { margin: 0; font-size: 16px; }
+  .tsk { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 8px; }
+  .tsk > div { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
+  .tsk .l { font-size: 12px; color: var(--text-3); }
+  .tsk .v { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .tsk .v .delta { font-size: 18px; }
+  @media (max-width: 900px) { .info2 { grid-template-columns: 1fr; } .annex dl { grid-template-columns: 1fr; gap: 2px; } .annex dd { margin-bottom: 8px; } }
+  @media (max-width: 480px) { .ready { grid-template-columns: repeat(2, 1fr); } }
+  .cedit { display: none; border: 0; background: none; padding: 0 0 0 4px; color: var(--primary); cursor: pointer; vertical-align: -3px; }
+  .cedit svg.i { width: 15px; height: 15px; }
+  td:hover > .cedit, .cedit:focus-visible { display: inline; }
+  @media (hover: none) { .cedit { display: inline; } }
+</style>
 </head>
 <body>
 <main>
-  <div class="small"><a href="/">← Tổng quan</a> · <a href="/registry">Registry</a></div>
+  <div class="small muted"><a href="/registry">Bộ chỉ tiêu</a> › Chi tiết</div>
   <div id="head"></div>
+  <div class="info2" id="info"></div>
 
-  <section class="card" style="margin-top:12px">
-    <div class="filters">
+  <section class="card" style="margin-top:14px" id="tsCard">
+    <div class="ts-head"><h3>Diễn biến theo kỳ</h3><div class="chart-ctl" id="tsCtl"></div></div>
+    <div class="tsk" id="tsKpi"></div>
+    <div id="tsChart"></div>
+    <p class="small muted" id="tsNote"></p>
+    <details class="small" id="tsYoyWrap"><summary style="cursor:pointer">So với cùng kỳ năm trước</summary><div class="table-wrap" style="margin-top:8px"><table id="tsYoy"></table></div></details>
+  </section>
+
+  <section class="card" style="margin-top:14px">
+    <h3 class="h" style="margin-bottom:10px">Chuỗi theo phân tổ và nguồn</h3>
+    <div class="chart-ctl">
+      <div class="seg" role="tablist" aria-label="Kỳ số liệu" id="ptype">
+        <button type="button" data-t="Y" class="on">Năm</button><button type="button" data-t="Q">Quý</button><button type="button" data-t="M">Tháng</button>
+      </div>
       <label class="small muted">Chuỗi chính <select id="s1" class="field"></select></label>
       <label class="small muted">So sánh với <select id="s2" class="field"><option value="">— không —</option></select></label>
       <label class="small muted">Địa bàn <select id="geo" class="field"></select></label>
@@ -23,76 +67,202 @@
     <p class="small muted" id="chartNote"></p>
   </section>
 
-  <h2 class="section">Bảng số liệu</h2>
+  <div class="tbl-head"><h2 class="section">Bảng số liệu</h2><button class="btn sm" id="csv"></button></div>
   <div class="table-wrap"><table id="table"></table></div>
-  <p class="small muted">● đã công bố · ◔ chờ duyệt (chưa dùng cho dashboard/báo cáo) · ↓ file minh chứng nguồn</p>
+  <div id="qwrap"></div>
+  <div id="refwrap"></div>
+  <p class="small muted" id="legendNote"></p>
 </main>
 <script>
-renderHeader("");
+renderHeader("/registry", { header: false });
+$("legendNote").innerHTML = `<span class="warn-text">${ic("clock")}</span> chờ duyệt (chưa dùng cho tổng quan/báo cáo) · ${ic("file")} minh chứng nguồn · ${simBadge()} số giả lập, không phải số liệu thật`;
+$("csv").innerHTML = ic("download") + "Tải CSV";
+const val = (p) => p.value == null ? esc(p.value_text || "–") : fmt(p.value);
 const code = new URLSearchParams(location.search).get("code") || "0428";
-let data = null;
+const FREQ = { Y: "năm", Q: "quý", M: "tháng" };
+const READY_TONE = { 2: "ok", 1: "warn", 0: "prov" };
+let data = null, ind = null, ptype = "Y";
+
+const isSeed = (s) => s.origin.startsWith("seed:");
+const hasSeed = () => data.series.some(isSeed);
+// Chỉ tiêu đã có số của Cục: nguồn khác (thu thập, tự tính, tài liệu) chỉ để đối chiếu
+const isMain = (s) => !hasSeed() || isSeed(s) || s.origin.startsWith("agency:");
+const ptsOf = (s, t) => s.points.filter((p) => (p.period_type || "Y") === t);
 
 async function load(geo) {
-  const [ind, d] = await Promise.all([api("/api/indicators/" + encodeURIComponent(code)),
+  const [i, d] = await Promise.all([api("/api/indicators/" + encodeURIComponent(code)),
     api(`/api/indicators/${encodeURIComponent(code)}/series?geography=${encodeURIComponent(geo || "Toàn quốc")}`)]);
-  data = d;
+  ind = i; data = d;
   const h = d.headline;
   document.title = `${code} – ${ind.name}`;
+  const leads = ind.lead_agencies.length ? ind.lead_agencies : [d.lead_agency_text].filter(Boolean);
   $("head").innerHTML = `
-    <div class="code" style="margin-top:10px">${esc(code)}</div><h2 style="margin:2px 0 6px">${esc(ind.name)}</h2>
-    <div>${conf(ind.confidence)} <span class="tag">${esc(ind.mvp_priority || "")}</span> ${ind.lead_agencies.map((a) => `<span class="tag">Chủ trì: ${esc(a)}</span>`).join("")}</div>
-    ${ind.aliases.map((a) => `<div class="warnbox">⚠ ${esc(a.note)}</div>`).join("")}
+    <div class="code" style="margin-top:10px">${esc(code)}</div><h2 style="margin:2px 0 2px">${esc(ind.name)}</h2>
+    ${d.name_en ? `<div class="small muted" lang="en" style="margin-bottom:6px">${esc(d.name_en)}</div>` : ""}
+    <div>${dataStatus(d.data_status)} ${d.stage ? `<span class="tag">${esc(d.stage)}</span>` : ""} ${conf(ind.confidence)} ${ind.mvp_priority ? `<span class="tag">${esc(ind.mvp_priority)}</span>` : ""}
+      ${leads.map((a) => `<span class="tag">Chủ trì: ${esc(a)}</span>`).join("")}${d.frequency ? ` <span class="tag">Tần suất: ${FREQ[d.frequency] || esc(d.frequency)}</span>` : ""}</div>
+    ${ind.aliases.map((a) => `<div class="warnbox">${ic("alert")}<span>${esc(a.note)}</span></div>`).join("")}
     <section class="stats" style="margin-top:12px">
-      <div class="stat"><div class="v">${h ? fmt(h.latest.value) : "–"} <span class="small muted">${esc(h ? h.unit || "" : "")}</span></div><div class="l">${h ? `${esc(h.breakdown)} · ${esc(h.latest.period)}` : "Chưa có số liệu đã công bố"}</div></div>
+      <div class="stat"><div class="v">${h ? val(h.latest) : "–"} <span class="small muted">${esc(h ? h.unit || "" : "")}</span></div><div class="l">${h ? `${esc(h.breakdown)} · ${esc(h.latest.period)} ${dataStatus(h.latest.data_status)}` : "Chưa có số liệu đã công bố"}</div></div>
       <div class="stat"><div class="v">${!h || h.change_pct == null ? "–" : h.lower_is_better
-          ? (() => { const d = h.previous.value - h.latest.value; return d === 0 ? "giữ hạng" : `${d > 0 ? "▲ tăng" : "▼ giảm"} ${Math.abs(d)} bậc`; })()
+          ? (() => { const x = h.previous.value - h.latest.value; return x === 0 ? "giữ hạng" : `${x > 0 ? "▲ tăng" : "▼ giảm"} ${Math.abs(x)} bậc`; })()
           : (h.change_pct > 0 ? "+" : "") + h.change_pct.toFixed(1) + "%"}</div><div class="l">So với ${h && h.previous ? esc(h.previous.period) : "kỳ trước"}${h && h.previous ? ` (${fmt(h.previous.value)})` : ""}</div></div>
       <div class="stat"><div class="v">${ind.target_value != null ? fmt(ind.target_value) : "–"}</div><div class="l">Mục tiêu${ind.target_year ? " " + ind.target_year : ""}${h && h.progress_pct != null ? ` · đạt ${h.progress_pct.toFixed(0)}%` : " · <a href='/registry'>đặt mục tiêu</a>"}</div></div>
       <div class="stat"><div class="v">${d.series.length}</div><div class="l">Chuỗi số liệu (phân tổ × nguồn)</div></div>
     </section>`;
+
+  // Kết quả, hạn chế, khuyến nghị (Annex A) và mức sẵn sàng dữ liệu
+  const annex = [["Kết quả mới nhất", d.latest_result_text], ["Hạn chế", d.limitation], ["Khuyến nghị", d.recommendation]].filter(([, v]) => v);
+  const ready = d.readiness || [];
+  $("info").innerHTML = (annex.length ? `<section class="card annex"><h3>Kết quả và khuyến nghị</h3><dl>${annex.map(([k, v]) => `<dt>${k}</dt><dd lang="en">${esc(v)}</dd>`).join("")}</dl>
+      <div class="note">Nội dung gốc tiếng Anh, trích từ báo cáo 2244 (Annex A).</div></section>` : "")
+    + (ready.length ? `<section class="card"><h3>Mức sẵn sàng dữ liệu</h3><div class="ready">${ready.map((r) => `<div class="dq dq-${READY_TONE[r.score] || "none"} cell" title="${esc(r.dimension)}: ${esc(r.level || "")}"><b>${esc(r.label)}</b>${esc(r.level_vi || "–")}</div>`).join("")}</div>
+      <div class="small muted" style="margin-top:8px">8 chiều chất lượng theo Annex B; ${ready.filter((r) => r.score === 2).length}/${ready.length} chiều đạt.</div></section>` : "");
+  $("info").style.display = annex.length || ready.length ? "" : "none";
+
   $("geo").innerHTML = d.geographies.map((g) => `<option ${g === (geo || "Toàn quốc") ? "selected" : ""}>${esc(g)}</option>`).join("") || "<option>Toàn quốc</option>";
-  const opts = d.series.map((s, i) => `<option value="${i}">${esc(s.breakdown)} — ${esc(s.origin_label)}${s.derived ? " (tự tính)" : ""}</option>`).join("");
-  $("s1").innerHTML = opts;
-  $("s2").innerHTML = '<option value="">— không —</option>' + opts;
-  const hi = d.series.findIndex((s) => s.breakdown === d.headline_breakdown && s.points.some((p) => p.status === "published"));
-  $("s1").value = String(Math.max(0, hi));
-  draw();
+  const types = ["Y", "Q", "M"].filter((t) => d.series.some((s) => ptsOf(s, t).length));
+  document.querySelectorAll("#ptype button").forEach((b) => {
+    const ok = types.includes(b.dataset.t);
+    b.disabled = !ok; b.hidden = !ok && b.dataset.t === "M"; b.title = ok ? "" : "Chỉ tiêu không có số liệu ở kỳ này";
+  });
+  if (!types.includes(ptype)) ptype = types[0] || "Y";
+  fillSeries();
   table();
 }
 
+function fillSeries() {
+  document.querySelectorAll("#ptype button").forEach((b) => b.classList.toggle("on", b.dataset.t === ptype));
+  const idx = data.series.map((s, i) => [s, i]).filter(([s]) => ptsOf(s, ptype).length);
+  const opts = idx.map(([s, i]) => `<option value="${i}">${esc(s.breakdown || "Tổng số")} — ${esc(s.origin_label)}${s.derived ? " (tự tính)" : ""}${s.simulated ? " (minh hoạ)" : ""}</option>`).join("");
+  $("s1").innerHTML = opts;
+  $("s2").innerHTML = '<option value="">— không —</option>' + opts;
+  const pref = idx.find(([s]) => s.breakdown === data.headline_breakdown && isMain(s) && s.points.some((p) => p.status === "published")) || idx[0];
+  if (pref) $("s1").value = String(pref[1]);
+  draw();
+}
+
 function draw() {
-  if (!data.series.length) { $("chart").innerHTML = '<div class="muted">Chưa có số liệu.</div>'; return; }
   const pick = [$("s1").value, $("s2").value].filter((v) => v !== "").map(Number).filter((v, i, a) => a.indexOf(v) === i);
-  const chosen = pick.map((i) => data.series[i]);
+  const chosen = pick.map((i) => data.series[i]).filter(Boolean);
+  if (!chosen.length) { $("chart").innerHTML = '<div class="muted small">Chưa có số liệu.</div>'; $("chartNote").textContent = ""; return; }
   const units = [...new Set(chosen.map((s) => s.unit))];
+  const notes = [];
   if (units.length > 1) {   // không vẽ 2 đơn vị khác nhau trên một trục
-    $("chartNote").textContent = `Không so sánh được trên cùng trục: "${units.join('" và "')}" khác đơn vị. Chỉ vẽ chuỗi chính.`;
+    notes.push(`Không so sánh được trên cùng trục: "${units.join('" và "')}" khác đơn vị. Chỉ vẽ chuỗi chính.`);
     chosen.splice(1);
-  } else $("chartNote").textContent = "Chỉ vẽ số liệu đã công bố; số chờ duyệt xem trong bảng.";
+  } else notes.push("Chỉ vẽ số liệu đã công bố; số chờ duyệt xem trong bảng.");
+  if (chosen.some((s) => s.simulated)) notes.push("Nét đứt: dữ liệu minh hoạ (giả lập), không phải số liệu thật.");
+  const pts0 = ptsOf(chosen[0], ptype).filter((p) => p.status === "published" && p.value != null);
+  if (pts0.length === 1) notes.push(`Mới có số liệu kỳ ${pts0[0].period}.`);
+  $("chartNote").textContent = notes.join(" ");
   lineChart($("chart"), {
-    series: chosen.map((s) => ({ name: `${s.breakdown} (${s.origin_label})`, points: s.points.filter((p) => p.status === "published").map((p) => ({ x: p.period, y: p.value, unit: s.unit })) })),
-    invert: chosen[0].lower_is_better, unit: chosen[0].unit,
-    target: chosen[0].breakdown === data.headline_breakdown ? data.target_value : null, height: 260 });
+    series: chosen.map((s) => ({ name: `${s.breakdown} (${s.origin_label})`, dashed: s.simulated,
+      points: ptsOf(s, ptype).filter((p) => p.status === "published" && p.value != null).map((p) => ({ x: p.period, y: p.value, unit: s.unit })) })),
+    invert: chosen[0].lower_is_better, unit: chosen[0].unit, periodLabel: FREQ[ptype],
+    target: chosen[0].breakdown === data.headline_breakdown && ptype === "Y" ? data.target_value : null, height: 260 });
 }
 
+// Admin: sửa một giá trị (bắt buộc ghi lý do; tạo phiên bản mới, bản cũ giữ trong lịch sử và Nhật ký)
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest(".cedit"); if (!b) return;
+  const v = await formDialog({ title: `Sửa giá trị ${code} · ${b.dataset.per}`, message: esc(b.dataset.bd), okLabel: "Lưu",
+    fields: [{ name: "value", label: "Giá trị mới", type: "number", required: true, value: b.dataset.v, hint: `Giá trị hiện tại: ${b.dataset.v === "" ? "–" : fmt(+b.dataset.v, 4)}` },
+             { name: "reason", label: "Lý do sửa", type: "textarea", required: true, placeholder: "Căn cứ: văn bản đính chính, người cung cấp…" }] });
+  if (!v) return;
+  try {
+    await api(`/api/admin/data-points/${b.dataset.pid}/edit`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(v) });
+    toast("Đã sửa giá trị; lưu vết trong Nhật ký", { action: { label: "Xem nhật ký", fn: () => location.href = `/audit?indicator=${encodeURIComponent(code)}` } });
+    await load($("geo").value);
+  } catch (er) { toast(er.message, { type: "err" }); }
+});
+
+// Bảng theo năm, theo quý và số liệu đối chiếu tách riêng
 function table() {
-  const periods = [...new Set(data.series.flatMap((s) => s.points.map((p) => p.period)))].sort().reverse().slice(0, 12);
-  $("table").innerHTML = `<thead><tr><th>Phân tổ</th><th>Nguồn</th><th>Đơn vị</th>${periods.map((p) => `<th class="num">${p}</th>`).join("")}</tr></thead><tbody>` +
-    data.series.map((s) => `<tr><td>${esc(s.breakdown)}${s.derived ? ' <span class="tag">tự tính</span>' : ""}</td><td class="small">${esc(s.origin_label)} ${conf(s.confidence)}</td><td class="small">${esc(s.unit || "")}</td>` +
+  const main = data.series.filter(isMain), ref = data.series.filter((s) => !isMain(s));
+  // bảng chính theo loại kỳ đầu tiên có số liệu (năm → quý → tháng); các loại kỳ còn lại tách bảng riêng
+  const types = ["Y", "Q", "M"].filter((t) => main.some((s) => ptsOf(s, t).length));
+  const NAME = { Y: "Theo năm", Q: "Theo quý", M: "Theo tháng" }, MAX = { Y: 12, Q: 8, M: 12 };
+  $("table").innerHTML = types.length ? tableHtml(main, types[0], MAX[types[0]]) : '<tbody><tr><td class="muted">Chưa có số liệu.</td></tr></tbody>';
+  $("qwrap").innerHTML = types.slice(1).map((t) => `<h3 class="section" style="font-size:15px;margin-top:18px">${NAME[t]}</h3><div class="table-wrap"><table>${tableHtml(main, t, MAX[t])}</table></div>`).join("");
+  const r = ["Y", "Q", "M"].map((t) => tableHtml(ref, t, MAX[t])).filter(Boolean);
+  $("refwrap").innerHTML = r.length ? `<h3 class="section" style="font-size:15px;margin-top:18px">Số liệu đối chiếu</h3>
+    <p class="small muted" style="margin:-4px 0 8px">Từ nguồn thu thập, tài liệu hoặc tự tính (kể cả số tính lại từ bộ 137); dùng để đối chiếu, không thay thế số liệu của Cục.</p>
+    ${r.map((x) => `<div class="table-wrap" style="margin-bottom:10px"><table>${x}</table></div>`).join("")}` : "";
+}
+function tableHtml(list, type, max) {
+  const rows = list.map((s) => ({ s, pts: ptsOf(s, type) })).filter((r) => r.pts.length);
+  if (!rows.length) return "";
+  const periods = [...new Set(rows.flatMap((r) => r.pts.map((p) => p.period)))].sort().reverse().slice(0, max);
+  return `<thead><tr><th style="min-width:240px">Phân tổ</th><th style="min-width:130px">Nguồn</th><th style="white-space:nowrap">Trạng thái dữ liệu</th><th style="white-space:nowrap">Đơn vị</th>${periods.map((p) => `<th class="num">${p}</th>`).join("")}</tr></thead><tbody>` +
+    rows.map(({ s, pts }) => {
+      const last = [...pts].sort((a, b) => a.period.localeCompare(b.period)).pop();
+      return `<tr><td>${esc(s.breakdown || "Tổng số")}${s.derived ? ' <span class="tag">tự tính</span>' : ""}</td><td class="small">${esc(s.origin_label)} ${conf(s.confidence)}</td><td>${dataStatus(last.data_status)}</td><td class="small">${esc(s.unit || "")}</td>` +
       periods.map((per) => {
-        const p = s.points.find((q) => q.period === per);
+        const p = pts.find((x) => x.period === per);
         if (!p) return '<td class="num muted">–</td>';
-        const mark = p.status === "published" ? "●" : '<span class="warn-text">◔</span>';
-        const ev = p.evidence_file_id ? ` <a href="/api/evidence/${p.evidence_file_id}" title="Minh chứng">↓</a>` : "";
-        return `<td class="num" title="${esc(p.excerpt || "")}">${mark} ${fmt(p.value)}${ev}</td>`;
-      }).join("") + "</tr>").join("") + "</tbody>";
+        const mark = p.status === "published" ? "" : `<span class="warn-text" title="Chờ duyệt">${ic("clock")}</span>`;
+        const ev = p.evidence_file_id ? ` <a href="/api/evidence/${p.evidence_file_id}" title="Minh chứng" aria-label="Minh chứng">${ic("file")}</a>` : "";
+        const ed = can("admin") && p.id ? `<button class="cedit" type="button" data-pid="${p.id}" data-per="${esc(per)}" data-bd="${esc(s.breakdown || "Tổng số")}" data-v="${p.value ?? ""}" title="Sửa giá trị" aria-label="Sửa giá trị kỳ ${esc(per)}">${ic("edit")}</button>` : "";
+        return `<td class="num${p.is_simulated ? " sim" : ""}" title="${esc(p.excerpt || "")}">${mark} ${val(p)}${ev}${ed}</td>`;
+      }).join("") + "</tr>";
+    }).join("") + "</tbody>";
 }
 
+function downloadCsv() {
+  const q = (v) => v == null ? "" : /[",\n;]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v);
+  const head = ["ma_chi_tieu", "phan_to", "nguon", "dia_ban", "ky", "loai_ky", "gia_tri", "gia_tri_chu", "don_vi", "trang_thai_du_lieu", "trang_thai_duyet", "minh_hoa"];
+  const geo = $("geo").value || "Toàn quốc";
+  const lines = data.series.flatMap((s) => s.points.map((p) => [code, s.breakdown, s.origin_label, geo, p.period, p.period_type || "Y",
+    p.value, p.value_text, s.unit, p.data_status, p.status, p.is_simulated ? 1 : 0].map(q).join(",")));
+  const blob = new Blob(["﻿" + [head.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `chi-tieu-${code}.csv` });
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// ---- diễn biến theo kỳ (giá trị tiêu biểu, có gộp kỳ, cửa sổ, mức thay đổi) ----
+const RES_LBL = { M: "tháng", Q: "quý", Y: "năm" }, RULE_LBL = { sum: "tổng", avg: "trung bình", last: "giá trị kỳ cuối" };
+const tsState = { res: null, window: null };
+async function loadTs() {
+  const p = new URLSearchParams();
+  if (tsState.res) p.set("res", tsState.res);
+  if (tsState.window) p.set("window", tsState.window);
+  const t = await api(`/api/indicators/${encodeURIComponent(code)}/timeseries?${p}`);
+  if (!t.res) { $("tsCard").style.display = "none"; return; }
+  tsState.res = t.res;
+  if (!tsState.window) { tsState.window = t.res === "M" ? 12 : 8; return loadTs(); }  // lần đầu: áp cửa sổ mặc định
+  $("tsCtl").innerHTML = segHtml("tsRes", ["M", "Q", "Y"].filter((r) => t.available.includes(r)).map((r) => [r, RES_NAME[r]]), t.res, "Độ phân giải")
+    + segHtml("tsWin", [[4, "4 kỳ"], [6, "6 kỳ"], [8, "8 kỳ"], [12, "12 kỳ"]], tsState.window, "Số kỳ gần nhất");
+  onSeg("tsRes", (v) => { tsState.res = v; tsState.window = v === "M" ? 12 : Math.min(tsState.window, 8); loadTs(); });
+  onSeg("tsWin", (v) => { tsState.window = +v; loadTs(); });
+  const c = t.changes, unit = t.unit || "";
+  $("tsKpi").innerHTML = [
+    [`Kỳ mới nhất · ${esc(c.period || "–")}`, c.value == null ? "–" : `${fmt(c.value, 3)} <span class="small muted">${esc(unit)}</span>`],
+    [`So với kỳ trước (${t.pop_label})`, pctTag(c.pop, c.previous_period ? `${c.previous_period}: ${fmt(c.previous)}` : "")],
+    [`So với cùng kỳ năm trước${c.same_period_last_year ? " · " + esc(c.same_period_last_year) : ""}`, pctTag(c.yoy)],
+    ...(c.ytd != null ? [[`Luỹ kế từ đầu năm`, `${fmt(c.ytd, 0)} <span class="small">${pctTag(c.ytd_yoy, "So với cùng kỳ năm trước")}</span>`]] : []),
+  ].map(([l, v]) => `<div><div class="l">${l}</div><div class="v">${v}</div></div>`).join("");
+  lineChart($("tsChart"), { series: [{ name: `${t.breakdown || code} (${RES_LBL[t.res]})`, dashed: t.simulated,
+    points: t.points.map((x) => ({ x: x.period, y: x.value, unit })) }], unit, periodLabel: RES_LBL[t.res], height: 240 });
+  const notes = [];
+  if (t.derived_from) notes.push(`Số ${RES_LBL[t.res]} được gộp từ số ${RES_LBL[t.derived_from]} theo quy tắc ${RULE_LBL[t.rule] || t.rule}; kỳ chưa đủ số liệu không được tính.`);
+  if (t.points.some((x) => x.value == null)) notes.push("Kỳ thiếu số liệu để trống, không nối liền.");
+  if (t.simulated) notes.push("Nét đứt: có số liệu minh hoạ (giả lập).");
+  if (c.ytd == null && t.rule && t.rule !== "sum" && t.res !== "Y") notes.push("Không tính luỹ kế vì chỉ tiêu không cộng dồn được.");
+  $("tsNote").textContent = notes.join(" ");
+  $("tsYoy").innerHTML = `<thead><tr><th>Kỳ</th><th class="num">Giá trị</th><th>Cùng kỳ năm trước</th><th class="num">Giá trị</th><th class="num">Thay đổi</th></tr></thead><tbody>` +
+    [...t.points].reverse().map((x) => `<tr><td>${esc(x.period)}${x.simulated ? " " + simBadge() : ""}</td><td class="num">${x.value == null ? "–" : fmt(x.value, 3)}</td>
+      <td class="small">${esc(x.same_period_last_year)}</td><td class="num">${x.value_last_year == null ? "–" : fmt(x.value_last_year, 3)}</td><td class="num">${pctTag(x.yoy)}</td></tr>`).join("") + "</tbody>";
+}
+
+document.querySelectorAll("#ptype button").forEach((b) => b.addEventListener("click", () => { if (!b.disabled) { ptype = b.dataset.t; fillSeries(); } }));
 $("s1").addEventListener("change", draw);
 $("s2").addEventListener("change", draw);
 $("geo").addEventListener("change", () => load($("geo").value));
-window.addEventListener("resize", () => data && draw());
-load();
+$("csv").addEventListener("click", () => data && downloadCsv());
+let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (data) draw(); if (tsState.res) loadTs(); }, 250); });
+load().catch((e) => toast("Không tải được dữ liệu: " + e.message, { type: "err" }));
+loadTs().catch((e) => toast("Không tải được chuỗi theo kỳ: " + e.message, { type: "err" }));
 </script>
 </body>
 </html>

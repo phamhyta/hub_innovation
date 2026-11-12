@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Địa phương – Dữ liệu Đổi mới sáng tạo</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/common.js"></script>
+<script src="/static/illus.js"></script>
+<script src="/static/charts.js"></script>
+<style>
+  .ctl { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin: 4px 0 14px; }
+  .ctl select { width: 520px; max-width: 100%; min-width: 0; }
+  .lay > * { min-width: 0; }
+  .lay { display: grid; grid-template-columns: 400px minmax(0, 1fr); gap: 18px; align-items: start; }
+  @media (max-width: 1000px) { .lay { grid-template-columns: minmax(0, 1fr); } }
+  .mapcard h3, .side2 h3 { margin: 0 0 4px; font-size: 14.5px; line-height: 1.35; }
+  .mapcard .sub { font-size: 12.5px; color: var(--text-3); margin-bottom: 12px; }
+  .tmap { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-rows: 48px; gap: 4px; }
+  .ptile { border-radius: 8px; padding: 4px 5px; display: flex; flex-direction: column; justify-content: space-between; font-size: 10.5px; line-height: 1.15; min-width: 0; cursor: default;
+    background: var(--surface); border: 1.5px dashed var(--border-strong); color: var(--text-3); }
+  .ptile .n { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+  .ptile .v { font-size: 13px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tmap.nm2 .ptile .n { white-space: normal; }
+  .ptile.rep { background: var(--primary-soft); border: 1.5px solid #B9CFF5; color: var(--primary); }
+  .ptile.has { background: var(--surface-2); border: 1.5px solid var(--border); color: var(--text-2); }
+  .ptile.txt .v { font-size: 10.5px; font-weight: 600; color: var(--text-3); }
+  .ptile:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+  .ptile.on { box-shadow: 0 0 0 2px var(--text); }
+  .klg { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--text-2); margin-top: 12px; }
+  .klg i { display: inline-block; width: 14px; height: 14px; border-radius: 4px; margin-right: 6px; vertical-align: -3px; }
+  .side2 { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .pt td { vertical-align: middle; }
+  .pt tr.on td { background: #F8FAFF; }
+  .pt td.num { font-variant-numeric: tabular-nums; }
+  .cov td { vertical-align: top; font-size: 13px; }
+  .cov tr.click { cursor: pointer; }
+  .cov tr.click:hover td, .cov tr.sel td { background: #F8FAFF; }
+  .cov .meter { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .cov .meter span { display: inline-block; width: 64px; height: 6px; border-radius: 3px; background: var(--grid); overflow: hidden; }
+  .cov .meter span i { display: block; height: 100%; background: var(--series-1); }
+  .orig { font-size: 11px; font-weight: 600; color: var(--text-3); background: var(--surface-2); border-radius: 4px; padding: 0 5px; margin-left: 4px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="warnbox" role="note"></div>
+  <div class="ctl"><select class="field" id="ind" aria-label="Chọn nội dung hiển thị"></select></div>
+  <div class="lay">
+    <section class="card mapcard"><h3 id="mTitle"></h3><div class="sub" id="mSub"></div><div class="tmap" id="map" role="list"></div><div class="klg" id="klg"></div></section>
+    <div class="side2">
+      <section><div class="table-wrap"><table class="pt"><thead id="thead"></thead><tbody id="rows"></tbody></table></div></section>
+      <section><h2 class="section" style="margin-top:8px">Độ phủ số liệu tỉnh</h2>
+        <div class="table-wrap"><table class="cov"><thead><tr><th>Chỉ tiêu</th><th>Tỉnh báo cáo</th><th class="hide-sm">Dùng được</th><th>Vấn đề chính</th></tr></thead><tbody id="cov"></tbody></table></div>
+        <p class="small muted">Nguồn: Báo cáo 2244, bảng độ phủ số liệu tỉnh. Bấm một dòng để xem số liệu chỉ tiêu đó.</p></section>
+    </div>
+  </div>
+</main>
+<script>
+renderHeader("/provinces");
+document.querySelector(".warnbox").innerHTML = ic("alert") + '<span id="warn"></span>';
+let data = null, cur = new URLSearchParams(location.search).get("indicator") || "", focus = null;
+const vi = (a, b) => a.localeCompare(b, "vi");
+const short = (n) => n.replace("TP. Hồ Chí Minh", "TP.HCM");
+const compact = (v) => Number(v).toLocaleString("vi-VN", { notation: "compact", maximumFractionDigits: 1 });
+const txt = (o) => o && o.text ? `${esc(o.text)}${o.original ? '<span class="orig" lang="en">EN</span>' : ""}` : "–";
+
+async function load() {
+  data = await api("/api/provinces" + (cur ? "?indicator=" + encodeURIComponent(cur) : ""));
+  $("warn").textContent = data.note;
+  $("ind").innerHTML = `<option value="">Tình trạng nộp báo cáo năm 2025 (${data.reported}/${data.total})</option>` +
+    data.indicators.map((i) => `<option value="${esc(i.code)}" ${i.code === cur ? "selected" : ""}>${esc(i.code)} – ${esc(i.name.length > 64 ? i.name.slice(0, 64) + "…" : i.name)} (${i.reporting} tỉnh có số)</option>`).join("");
+  render();
+}
+
+function render() {
+  const regs = [...data.regions].sort((a, b) => vi(a.name, b.name)), I = data.indicator, V = data.values;
+  const unitOf = (rc) => (V[rc] && V[rc].unit) || (I && I.unit) || "";
+  if (!I) {
+    $("mTitle").textContent = `${data.reported}/${data.total} tỉnh, thành phố đã nộp báo cáo năm 2025`;
+    $("mSub").textContent = "Mỗi ô là một tỉnh, thành phố, đặt theo vị trí địa lý tương đối.";
+    $("klg").innerHTML = `<span><i class="ptile rep" style="border-style:solid"></i>Đã nộp</span><span><i class="ptile" style="padding:0"></i>Chưa nộp</span>`;
+  } else {
+    const n = Object.values(V).filter((x) => x.value != null).length;
+    $("mTitle").textContent = `${I.code} – ${I.name}`;
+    $("mSub").textContent = `${n}/${data.total} tỉnh có số liệu, năm ${I.period || "–"}. Ô hiển thị giá trị, không tô màu theo độ lớn.`;
+    $("klg").innerHTML = `<span><i class="ptile has" style="padding:0"></i>Có số liệu</span><span><i class="ptile" style="padding:0"></i>Không có số liệu</span>`;
+  }
+  $("map").classList.toggle("nm2", !I);
+  $("map").innerHTML = data.regions.filter((r) => r.col != null).map((r) => {
+    const v = V[r.code];
+    let cls = "", val = "", tip;
+    if (!I) { cls = r.reported_2025 ? "rep" : ""; val = r.reported_2025 ? "Đã nộp" : "Chưa nộp"; tip = [`${r.reported_2025 ? "Đã nộp" : "Chưa nộp"} báo cáo năm 2025`, `${r.indicators_with_value} chỉ tiêu có số liệu`]; }
+    else if (v && v.value != null) { cls = "has"; val = compact(v.value); tip = [`<b>${fmt(v.value, 3)}</b> ${esc(unitOf(r.code))}`, "Tỉnh báo cáo, chưa kiểm chứng"]; }
+    else if (v) { cls = "has txt"; val = v.value_text || "–"; tip = [esc(v.value_text || "Không có giá trị")]; }
+    else { val = "–"; tip = ["Không có số liệu"]; }
+    return `<div class="ptile ${cls} ${focus === r.code ? "on" : ""}" role="listitem" style="grid-column:${r.col + 1};grid-row:${r.row + 1}" ${tipAttr(r.name, tip)} data-rc="${r.code}">
+      <span class="n">${esc(short(r.name))}</span><span class="v">${esc(I ? val : "")}</span></div>`;
+  }).join("");
+  bindTips($("map").parentElement);
+  $("map").querySelectorAll(".ptile").forEach((t) => t.onclick = () => { focus = focus === t.dataset.rc ? null : t.dataset.rc; render(); const row = document.querySelector(`tr[data-rc="${focus}"]`); row && row.scrollIntoView({ block: "nearest" }); });
+
+  // bảng giá trị: luôn sắp theo tên tỉnh (không sắp theo giá trị)
+  if (!I) {
+    $("thead").innerHTML = `<tr><th>Tỉnh, thành phố</th><th>Báo cáo năm 2025</th><th class="num">Chỉ tiêu có số liệu</th></tr>`;
+    $("rows").innerHTML = regs.map((r) => `<tr data-rc="${r.code}" class="${focus === r.code ? "on" : ""}"><td>${esc(r.name)}</td>
+      <td>${r.reported_2025 ? `<span class="status st-verified">${ic("ok")}Đã nộp</span>` : '<span class="muted small">Chưa nộp</span>'}</td><td class="num">${r.indicators_with_value || "–"}</td></tr>`).join("");
+  } else {
+    $("thead").innerHTML = `<tr><th>Tỉnh, thành phố</th><th class="num">Giá trị</th><th>Đơn vị</th><th class="hide-sm">Trạng thái</th></tr>`;
+    $("rows").innerHTML = regs.map((r) => { const v = V[r.code];
+      return `<tr data-rc="${r.code}" class="${focus === r.code ? "on" : ""}"><td>${esc(r.name)}</td>
+        <td class="num">${!v ? '<span class="muted">–</span>' : v.value != null ? fmt(v.value, 3) : `<span class="muted small">${esc(v.value_text || "–")}</span>`}</td>
+        <td class="small">${v ? esc(unitOf(r.code)) : ""}</td><td class="hide-sm">${v ? dataStatus(v.data_status) : ""}</td></tr>`; }).join("");
+  }
+  $("cov").innerHTML = data.coverage.map((c) => `<tr class="click ${c.indicator_code === cur ? "sel" : ""}" data-code="${esc(c.indicator_code)}">
+    <td><span class="code">${esc(c.indicator_code)}</span> <span class="small">${esc((c.indicator_name || "").slice(0, 48))}${(c.indicator_name || "").length > 48 ? "…" : ""}</span></td>
+    <td><div class="meter"><span><i style="width:${c.provinces_reporting / c.provinces_total * 100}%"></i></span>${c.provinces_reporting}/${c.provinces_total}</div></td>
+    <td class="hide-sm">${txt(c.usable_coverage)}</td><td>${txt(c.main_issue)}</td></tr>`).join("") || `<tr><td colspan="4">${emptyState("Chưa có thông tin độ phủ")}</td></tr>`;
+  $("cov").querySelectorAll("tr.click").forEach((tr) => tr.onclick = () => select(tr.dataset.code));
+}
+
+function select(code) {
+  cur = code; focus = null;
+  history.replaceState(null, "", code ? `?indicator=${encodeURIComponent(code)}` : location.pathname);
+  load().catch((e) => toast(e.message, { type: "err" }));
+}
+$("ind").onchange = () => select($("ind").value);
+load().catch((e) => toast("Không tải được dữ liệu: " + e.message, { type: "err" }));
+</script>
+</body>
+</html>

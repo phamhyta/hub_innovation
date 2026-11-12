@@ -3,31 +3,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Innovation Hub – Registry chỉ tiêu</title>
+<title>Bộ chỉ tiêu – Dữ liệu Đổi mới sáng tạo</title>
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/common.js"></script>
+<script src="/static/illus.js"></script>
 </head>
 <body>
 <main>
-  <div class="filters" style="justify-content:space-between">
-    <div class="muted">Registry: QĐ 2244 · QĐ 3994 · Tiêu chí đánh giá chương trình</div>
-    <span id="tpl"></span>
-  </div>
-  <section class="stats" id="stats"></section>
+  <span class="ph-actions" id="tpl"></span>
+  <section class="stats" id="stats" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"></section>
 
   <section class="filters">
-    <input id="q" type="search" placeholder="Tìm theo mã hoặc tên chỉ tiêu (không cần dấu)…">
-    <select id="framework"><option value="">Mọi văn bản</option><option value="QD2244">QĐ 2244</option><option value="QD3994">QĐ 3994 (BKHCN)</option><option value="PROGRAM">Tiêu chí chương trình</option><option value="PROPOSED">Đề xuất mới (DX)</option></select>
-    <select id="pillar"><option value="">Mọi trụ cột</option><option value="input">Đầu vào</option><option value="output">Kết quả</option><option value="efficiency">Hiệu quả</option><option value="impact">Tác động</option></select>
-    <select id="collection_type"><option value="">Mọi cách thu thập</option></select>
-    <select id="confidence"><option value="">Mọi mức tin cậy</option><option>A</option><option>B</option><option>C</option><option>D</option></select>
-    <select id="mvp"><option value="">Mọi giai đoạn MVP</option><option>MVP-1</option><option>MVP-2</option><option>MVP-3</option></select>
-    <select id="agency_id"><option value="">Mọi cơ quan</option></select>
+    <input id="q" type="search" placeholder="Tìm mã hoặc tên (không cần dấu)…">
+    <select id="framework"><option value="">Văn bản</option><option value="QD2244">QĐ 2244</option><option value="QD3994">QĐ 3994 (BKHCN)</option><option value="PROGRAM">Tiêu chí chương trình</option><option value="PROPOSED">Đề xuất mới (DX)</option></select>
+    <select id="pillar"><option value="">Trụ cột</option><option value="input">Đầu vào</option><option value="output">Kết quả</option><option value="efficiency">Hiệu quả</option><option value="impact">Tác động</option></select>
+    <select id="collection_type"><option value="">Thu thập</option></select>
+    <select id="confidence"><option value="">Tin cậy</option><option>A</option><option>B</option><option>C</option><option>D</option></select>
+    <select id="mvp"><option value="">MVP</option><option>MVP-1</option><option>MVP-2</option><option>MVP-3</option></select>
+    <select id="agency_id" style="max-width:200px"><option value="">Cơ quan</option></select>
   </section>
   <div class="count" id="count"></div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Mã</th><th>Chỉ tiêu</th><th class="hide-sm">Trụ cột / nhóm</th><th class="hide-sm">Thu thập</th><th>Tin cậy</th><th>MVP</th><th class="hide-sm">Chủ trì</th></tr></thead>
+      <thead><tr><th style="width:92px">Mã</th><th>Chỉ tiêu</th><th class="hide-sm" style="width:110px">Trụ cột</th><th style="width:76px">Tin cậy</th><th class="hide-sm" style="width:80px">MVP</th></tr></thead>
       <tbody id="rows"></tbody>
     </table>
   </div>
@@ -48,19 +46,20 @@ const FILTERS = ["q", "framework", "pillar", "collection_type", "confidence", "m
 
 async function init() {
   Object.entries(CT).forEach(([k, v]) => $("collection_type").insertAdjacentHTML("beforeend", `<option value="${k}">${v}</option>`));
-  const [stats, agencies, tpls, rs] = await Promise.all([api("/api/indicators/stats"), api("/api/agencies"), api("/api/templates"), api("/api/review/summary")]);
+  const [stats, agencies, tpls, rs] = await Promise.all([api("/api/indicators/stats"), api("/api/agencies"), api("/api/templates"), (can("admin") ? api("/api/review/summary") : Promise.resolve({})).catch(() => ({}))]);
   agencies.filter((a) => a.lead_count + a.coordinate_count > 0)
     .forEach((a) => $("agency_id").insertAdjacentHTML("beforeend", `<option value="${a.id}">${esc(a.name)} (${a.lead_count + a.coordinate_count})</option>`));
-  if (tpls.length) $("tpl").innerHTML = `<a class="btn primary" href="${tpls[0].download_url}">⬇ Tải template ${tpls[0].indicators.join(" + ")}</a>`;
-  const fw = stats.by_framework, c = stats.by_confidence, m = stats.by_mvp;
+  if (tpls.length) $("tpl").innerHTML = `<a class="btn" href="${tpls[0].download_url}">${ic("download")}Tải mẫu ${tpls[0].indicators.join(" + ")}</a>`;
+  const fw = stats.by_framework, c = stats.by_confidence, m = stats.by_mvp, bs = stats.by_set || {};
+  const sub = document.querySelector(".ph p");
+  if (sub) sub.textContent = [[bs["2244"], "chỉ tiêu QĐ 2244"], [bs.PROGRAM, "tiêu chí đánh giá chương trình"], [bs.PROPOSED, "chỉ tiêu đề xuất"]]
+    .filter(([n]) => n).map(([n, l]) => `${n} ${l}`).join(" · ");
   $("stats").innerHTML = [
-    [stats.indicators, "Chỉ tiêu gốc"],
-    [stats.framework_entries, `Bản ghi theo văn bản (${fw.QD2244 || 0} + ${fw.QD3994 || 0} + ${fw.PROGRAM || 0}${fw.PROPOSED ? " + " + fw.PROPOSED + " đề xuất" : ""})`],
-    [m["MVP-1"] || 0, "Ưu tiên MVP-1"],
-    [rs.indicators_with_published_data || 0, "Chỉ tiêu đã có dữ liệu công bố"],
-    [rs.by_status.needs_review || 0, "Điểm dữ liệu chờ duyệt"],
-    [stats.aliases, "Xung đột mã cần đối chiếu"],
-  ].map(([v, l]) => `<div class="stat"><div class="v">${v}</div><div class="l">${l}</div></div>`).join("");
+    [stats.indicators, "Chỉ tiêu", `QĐ 2244: ${fw.QD2244 || 0} (QĐ 3994 phân công ${fw.QD3994 || 0}) · Tiêu chí chương trình: ${fw.PROGRAM || 0}${fw.PROPOSED ? " · Đề xuất: " + fw.PROPOSED : ""}`],
+    [rs.indicators_with_published_data || 0, "Có số liệu", "Chỉ tiêu đã có số liệu công bố"],
+    [m["MVP-1"] || 0, "Ưu tiên MVP-1", "Có thể tự động hoá sớm"],
+    [stats.aliases, "Xung đột mã", "Mã lệch giữa các văn bản – cần đối chiếu"],
+  ].map(([v, l, tip]) => `<div class="stat" title="${esc(tip)}"><span class="l">${l}</span><span class="v">${v}</span></div>`).join("");
   FILTERS.forEach((id) => $(id).addEventListener("input", debounce(load, 200)));
   load();
 }
@@ -74,13 +73,11 @@ async function load() {
   $("count").textContent = `${items.length} chỉ tiêu`;
   $("rows").innerHTML = items.map((i) => `
     <tr class="click" onclick="openDrawer('${esc(i.code)}')">
-      <td class="code">${esc(i.code)}${i.alias_codes.length ? `<div class="alias">≈ ${i.alias_codes.map(esc).join(", ")}</div>` : ""}</td>
-      <td>${esc(i.name)}<div>${i.frameworks.map((f) => `<span class="tag">${FW[f]}</span>`).join("")}</div></td>
-      <td class="hide-sm">${esc(PILLAR[i.pillar] || "")}<div class="muted">${esc(i.group_code || "")} ${esc(i.group_name || "")}</div></td>
-      <td class="hide-sm">${i.collection_types.map((t) => `<span class="tag">${CT[t] || t}</span>`).join("")}</td>
+      <td><span class="code">${esc(i.code)}</span>${i.alias_codes.length ? `<div class="alias" title="Mã khác trong văn bản khác">≈ ${i.alias_codes.map(esc).join(", ")}</div>` : ""}</td>
+      <td><div style="font-weight:500">${esc(i.name)}</div><div class="small muted">${i.frameworks.map((f) => FW[f]).join(" · ")}${i.lead_agencies.length ? " · " + esc(i.lead_agencies[0]) : ""} ${dataStatus(i.data_status)}</div></td>
+      <td class="hide-sm">${esc(PILLAR[i.pillar] || "")}</td>
       <td>${conf(i.confidence)}</td>
-      <td style="white-space:nowrap">${esc(i.mvp_priority || "")}</td>
-      <td class="hide-sm">${i.lead_agencies.map(esc).join("<br>")}</td>
+      <td class="hide-sm"><span class="code">${esc(i.mvp_priority || "–")}</span></td>
     </tr>`).join("");
 }
 
@@ -90,9 +87,9 @@ function dataTable(points) {
   points.forEach((p) => (groups[p.breakdown + " · " + p.origin] ||= []).push(p));
   return Object.entries(groups).map(([k, ps]) => {
     const [bd, origin] = [ps[0].breakdown, ps[0].origin];
-    return `<div class="entry"><div class="hd"><b>${esc(bd)}</b><span class="tag">${esc(origin)}</span>${conf(ps[0].confidence)}</div>
+    return `<div class="entry"><div class="hd"><b>${esc(bd)}</b><span class="tag">${esc(originLabel(origin))}</span>${conf(ps[0].confidence)}${dataStatus(ps[ps.length - 1].data_status)}</div>
       <div class="small">${ps.sort((a, b) => a.period.localeCompare(b.period)).map((p) =>
-        `<span title="${esc(STATUS[p.status])}" style="margin-right:12px;white-space:nowrap">${esc(p.period)}: <b>${fmt(p.value)}</b> ${esc(p.unit || "")}${p.status !== "published" ? ` <span class="status st-${p.status}">${esc(STATUS[p.status])}</span>` : ""}</span>`).join(" ")}</div></div>`;
+        `<span title="${esc(STATUS[p.status])}" style="margin-right:12px;white-space:nowrap">${esc(p.period)}: <b>${p.value == null ? esc(p.value_text || "–") : fmt(p.value)}</b> ${esc(p.unit || "")}${p.status !== "published" ? ` <span class="status st-${p.status}">${esc(STATUS[p.status])}</span>` : ""}${p.is_simulated ? " " + simBadge() : ""}</span>`).join(" ")}</div></div>`;
   }).join("");
 }
 
@@ -116,17 +113,17 @@ async function openDrawer(code) {
   const val = (v) => esc(v ?? "");
   const live = pts.filter((p) => p.status !== "rejected");
   $("drawer").innerHTML = `
-    <button class="btn close" onclick="closeDrawer()">Đóng ✕</button>
+    <button class="icon-btn close" onclick="closeDrawer()" aria-label="Đóng">${ic("x")}</button>
     <div class="code">${esc(d.code)}</div>
     <h2>${esc(d.name)}</h2>
     <div>${conf(d.confidence)} <span class="tag">${esc(d.mvp_priority || "")}</span> <span class="tag">${esc(PILLAR[d.pillar] || "")}</span> ${d.collection_types.map((t) => `<span class="tag">${CT[t] || t}</span>`).join("")}</div>
-    ${d.aliases.map((a) => `<div class="warnbox">⚠ ${esc(a.note)}</div>`).join("")}
+    ${d.aliases.map((a) => `<div class="warnbox">${ic("alert")}<span>${esc(a.note)}</span></div>`).join("")}
 
     <h3>Dữ liệu toàn quốc (${live.length} điểm)</h3>
     ${dataTable(live)}
 
     <h3>Thông tin nghiệp vụ (admin bổ sung)</h3>
-    <form class="edit" onsubmit="save(event, '${esc(d.code)}')">
+    <form class="edit" onsubmit="save(event, '${esc(d.code)}')" ${can("admin") ? "" : "inert hidden"}>
       <label class="full">Định nghĩa<textarea name="definition">${val(d.definition)}</textarea></label>
       <label class="full">Công thức tính<textarea name="formula">${val(d.formula)}</textarea></label>
       <label>Đơn vị<input name="unit" value="${val(d.unit)}"></label>
@@ -135,6 +132,7 @@ async function openDrawer(code) {
       <label>Năm mục tiêu<input name="target_year" type="number" value="${val(d.target_year)}" placeholder="2030"></label>
       <div class="full"><button class="btn primary">Lưu</button><span class="saved" id="saved"></span></div>
     </form>
+    ${can("admin") ? "" : `<div class="small muted">${[["Định nghĩa", d.definition], ["Công thức", d.formula], ["Đơn vị", d.unit], ["Mục tiêu", d.target_value != null ? `${d.target_value} (${d.target_year || "–"})` : null]].filter(([, v]) => v != null && v !== "").map(([k, v]) => `<div><b>${k}:</b> ${esc(String(v))}</div>`).join("") || "Chưa có thông tin bổ sung."}</div>`}
 
     <h3>Theo từng văn bản (${d.entries.length})</h3>
     ${entries}
@@ -154,7 +152,7 @@ async function save(ev, code) {
   for (const [k, v] of f.entries()) body[k] = v === "" ? null : (k.startsWith("target_") ? Number(v) : v);
   try {
     await api("/api/indicators/" + encodeURIComponent(code), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    $("saved").textContent = "Đã lưu ✓";
+    $("saved").textContent = "Đã lưu"; toast("Đã lưu thông tin chỉ tiêu");
   } catch (e) { $("saved").textContent = "Lỗi khi lưu: " + e.message; }
 }
 

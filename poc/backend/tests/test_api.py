@@ -55,7 +55,7 @@ def test_agencies(client):
 
 def test_index_page(client):
     r = client.get("/registry")
-    assert r.status_code == 200 and "Registry" in r.text
+    assert r.status_code == 200 and "Bộ chỉ tiêu" in r.text
 
 
 def test_template_file_matches_spec(client):

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nhật ký – Dữ liệu Đổi mới sáng tạo</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/common.js"></script>
+<script src="/static/illus.js"></script>
+<style>
+  .flt { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: flex-end; margin-bottom: 14px; }
+  .flt label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--text-3); min-width: 0; }
+  .flt .field { height: 38px; min-width: 0; }
+  .flt label.w { flex: 1 1 200px; } .flt label.w .field { width: 100%; }
+  @media (max-width: 600px) { .flt label { flex: 1 1 140px; } .flt .field { width: 100%; } }
+  .lg td { vertical-align: top; font-size: 13px; }
+  .lg td.t { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--text-2); }
+  .lg .who b { display: block; font-weight: 600; }
+  .lg .who span { font-size: 12px; color: var(--text-3); }
+  .lg .act { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; }
+  .lg .chg { font-variant-numeric: tabular-nums; }
+  .lg .chg del { color: var(--text-3); }
+  .lg .chg ins { text-decoration: none; font-weight: 600; }
+  .lg .why { color: var(--text-2); max-width: 340px; }
+  .k-review { color: var(--ok); } .k-value { color: var(--warn); } .k-other { color: var(--primary); }
+</style>
+</head>
+<body>
+<main>
+  <button class="btn ph-actions" id="csv"></button>
+  <form class="flt" id="flt">
+    <label class="w">Người thực hiện<select class="field" name="actor"><option value="">Tất cả</option></select></label>
+    <label>Chỉ tiêu<input class="field" name="indicator" placeholder="vd. 0201" size="8"></label>
+    <label>Loại thao tác<select class="field" name="action"><option value="">Tất cả</option></select></label>
+    <label>Từ ngày<input class="field" type="date" name="since"></label>
+    <label>Đến ngày<input class="field" type="date" name="until"></label>
+    <button class="btn" type="reset" id="clr"></button>
+  </form>
+  <div class="table-wrap"><table class="lg"><thead><tr><th>Thời điểm</th><th>Người thực hiện</th><th>Thao tác</th><th>Đối tượng</th><th>Cũ → mới</th><th class="hide-sm">Lý do / ghi chú</th></tr></thead><tbody id="rows"></tbody></table></div>
+  <p class="small muted" id="note"></p>
+</main>
+<script>
+renderHeader("/audit");
+const ST = { needs_review: "Chờ duyệt", published: "Đã công bố", rejected: "Từ chối", collected: "Đã thu thập", verified: "Đã xác minh" };
+const VIS = { public: "Công khai", internal: "Nội bộ" };
+const FIELD = { visibility: "Hiển thị", data_status: "Trạng thái dữ liệu", definition: "Định nghĩa", formula: "Công thức", unit: "Đơn vị", frequency: "Tần suất", target_value: "Mục tiêu", target_year: "Năm mục tiêu" };
+let data = null;
+$("csv").innerHTML = ic("download") + "Tải CSV";
+$("clr").innerHTML = ic("x") + "Bỏ lọc";
+const q0 = new URLSearchParams(location.search);
+for (const [k, v] of q0) if ($("flt").elements[k]) $("flt").elements[k].value = v;
+const atTime = (t) => t ? new Date(t + (String(t).endsWith("Z") ? "" : "Z")).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" }) : "–";
+const num = (v, t) => v == null ? (t ? esc(t) : "–") : fmt(v, 4);
+const val = (k, v) => k === "visibility" ? VIS[v] || v : k === "data_status" ? (DQ[v] ? DQ[v][0] : v || "–") : v ?? "–";
+
+function change(i) {
+  const d = i.detail || {};
+  if (i.kind === "review") return `<span class="chg">${esc(ST[d.from] || d.from || "–")} → <ins>${esc(ST[d.to] || d.to)}</ins></span>`;
+  if (i.action === "value.edit") return `<span class="chg"><del>${num(d.from, d.from_text)}</del> → <ins>${num(d.to, d.to_text)}</ins></span>`;
+  if (i.action === "indicator.update") return Object.entries(d).map(([k, x]) => `<div class="chg">${esc(FIELD[k] || k)}: <del>${esc(String(val(k, x.from)))}</del> → <ins>${esc(String(val(k, x.to)))}</ins></div>`).join("");
+  if (i.action === "release.publish" && d.observations) return `<span class="small">${Object.entries(d.observations).map(([k, n]) => `${({ new: "mới", updated: "đổi", unchanged: "giữ", removed: "bỏ" })[k] || k} ${n}`).join(" · ")}</span>`;
+  if (i.action === "findings.update") return `<span class="small">${d.before} → ${d.after} đoạn</span>`;
+  if (i.action === "mapping.delete") return `<span class="small">Gỡ ${d.retired_points || 0} số tính lại</span>`;
+  return "";
+}
+const kcls = (i) => i.kind === "review" ? "k-review" : i.action === "value.edit" ? "k-value" : "k-other";
+const kic = (i) => i.kind === "review" ? "review" : i.action === "value.edit" ? "edit" : i.action.startsWith("auth") ? "user" : i.action.startsWith("mapping") ? "refresh" : i.action.startsWith("release") ? "upload" : "settings";
+
+async function load() {
+  const p = new URLSearchParams([...new FormData($("flt"))].filter(([, v]) => v));
+  history.replaceState(null, "", p.toString() ? "?" + p : location.pathname);
+  $("rows").innerHTML = skeletonRows(6, 6);
+  data = await api("/api/admin/audit?" + p);
+  const a = $("flt").elements.actor, cur = a.value;
+  a.innerHTML = `<option value="">Tất cả</option>` + data.actors.map((x) => `<option ${x === cur ? "selected" : ""}>${esc(x)}</option>`).join("");
+  const ac = $("flt").elements.action, curA = ac.value;
+  ac.innerHTML = `<option value="">Tất cả</option>` + data.actions.map((x) => `<option value="${x.key}" ${x.key === curA ? "selected" : ""}>${esc(x.label)}</option>`).join("");
+  $("rows").innerHTML = data.items.map((i) => `<tr>
+    <td class="t">${atTime(i.at)}</td>
+    <td class="who"><b>${esc(i.actor || "–")}</b>${i.role ? `<span>${esc(ROLE_LABEL[i.role] || i.role)}</span>` : ""}</td>
+    <td><span class="act ${kcls(i)}">${ic(kic(i))}${esc(i.action_label)}</span></td>
+    <td>${i.indicator_code ? `<a href="/indicator?code=${encodeURIComponent(i.indicator_code)}"><span class="code">${esc(i.indicator_code)}</span></a> ` : ""}<span class="small">${esc(i.target === i.indicator_code ? "" : (i.target || "").replace(i.indicator_code ? i.indicator_code + " · " : "\u0000", ""))}</span></td>
+    <td>${change(i)}</td>
+    <td class="hide-sm why">${esc(i.reason || "")}</td></tr>`).join("") || `<tr><td colspan="6">${emptyState("Không có thao tác phù hợp", "search")}</td></tr>`;
+  $("note").textContent = `${data.items.length} thao tác${data.items.length >= 300 ? " (300 gần nhất; thu hẹp bộ lọc để xem thêm)" : ""}. Gồm thao tác quản trị và lịch sử duyệt số liệu.`;
+}
+let t;
+$("flt").addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => load().catch((e) => toast(e.message, { type: "err" })), 300); });
+$("flt").addEventListener("reset", () => setTimeout(() => load(), 0));
+$("csv").onclick = () => data && downloadCsv("nhat-ky.csv", ["thoi_diem", "nguoi", "vai_tro", "thao_tac", "chi_tieu", "doi_tuong", "chi_tiet", "ly_do"],
+  data.items.map((i) => [i.at, i.actor, i.role, i.action_label, i.indicator_code, i.target, JSON.stringify(i.detail || {}), i.reason]));
+load().catch((e) => toast("Không tải được dữ liệu: " + e.message, { type: "err" }));
+</script>
+</body>
+</html>

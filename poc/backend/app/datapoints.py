@@ -8,6 +8,7 @@ Mỗi lần đổi trạng thái đều ghi review_logs (audit trail).
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from sqlalchemy import select
@@ -25,6 +26,22 @@ from app.models import (
 )
 
 NATIONAL = "Toàn quốc"
+NATIONAL_CODE = "VN"
+
+
+def period_type_of(period: str) -> str:
+    """'2025' → Y, '2025-Q4' → Q, '2025-11' → M."""
+    p = str(period)
+    if re.fullmatch(r"\d{4}-Q[1-4]", p):
+        return "Q"
+    if re.fullmatch(r"\d{4}-\d{2}", p):
+        return "M"
+    return "Y"
+
+
+def is_simulated_origin(origin: str) -> bool:
+    """Nguồn giả lập: file mẫu của đơn vị ghi '(giả lập)', hoặc dữ liệu minh hoạ trong file seed."""
+    return "giả lập" in origin.lower() or origin == "seed:S_SIM"
 
 
 @dataclass
@@ -92,8 +109,13 @@ def upsert_observation(
     submission: Submission | None = None,
     crawl_run: CrawlRun | None = None,
     cache: dict | None = None,
+    note: str | None = None,
+    extra: dict | None = None,
 ) -> tuple[DataPoint, str]:
-    """Trả về (điểm dữ liệu, kết quả) với kết quả ∈ {'new', 'updated', 'unchanged'}."""
+    """Trả về (điểm dữ liệu, kết quả) với kết quả ∈ {'new', 'updated', 'unchanged'}.
+
+    extra: giá trị cho các cột bổ sung (data_status, is_simulated, period_type, region_code, release_id).
+    """
     ind = _indicator(session, obs.indicator_code, cache)
     current = current_point(session, ind.id, obs, origin)
     if current is not None and _same_value(current, obs):
@@ -120,7 +142,12 @@ def upsert_observation(
         extracted_by=extracted_by,
         warnings=list(obs.warnings),
         meta=dict(obs.meta),
+        period_type=period_type_of(obs.period),
+        is_simulated=is_simulated_origin(origin),
+        region_code=NATIONAL_CODE if obs.geography == NATIONAL else "XX",
     )
+    for k, v in (extra or {}).items():
+        setattr(dp, k, v)
     outcome = "new"
     if current is not None:
         current.is_current = False
@@ -129,7 +156,8 @@ def upsert_observation(
         outcome = "updated"
     session.add(dp)
     session.flush()
-    note = "Tự động công bố: nguồn tin cậy A, không có cảnh báo" if publish else "Chờ duyệt"
+    if note is None:
+        note = "Tự động công bố: nguồn tin cậy A, không có cảnh báo" if publish else "Chờ duyệt"
     log(session, dp, dp.status, "system", note)
     return dp, outcome
 
@@ -138,6 +166,8 @@ def upsert_observation(
 ALLOWED = {
     "approve": ({DataStatus.NEEDS_REVIEW, DataStatus.REJECTED}, DataStatus.PUBLISHED),
     "reject": ({DataStatus.NEEDS_REVIEW, DataStatus.PUBLISHED}, DataStatus.REJECTED),
+    # mở lại = đưa về hàng chờ (dùng cho "Hoàn tác"); có ghi nhật ký như mọi thao tác khác
+    "reopen": ({DataStatus.PUBLISHED, DataStatus.REJECTED}, DataStatus.NEEDS_REVIEW),
 }
 
 

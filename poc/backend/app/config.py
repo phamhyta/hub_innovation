@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     database_url: str = f"sqlite:///{BACKEND_DIR / 'innovation_hub.db'}"
     workbook_path: Path = POC_DIR / "data" / "raw" / "indicator_survey.xlsx"
     templates_dir: Path = POC_DIR / "templates"
+    # File dữ liệu chuẩn của Cục (repo CSIRO-2244-Documents, data/seed_data_2244.xlsx)
+    seed_path: Path = POC_DIR / "data" / "seed" / "seed_data_2244.xlsx"
 
     # Kho file minh chứng (snapshot crawl, file upload). PoC dùng thư mục local;
     # MinIO/S3 sẽ thay thế khi triển khai (cùng interface trong app/storage.py).
@@ -23,6 +25,14 @@ class Settings(BaseSettings):
     http_user_agent: str = "InnovationHubPoC/0.1 (research prototype)"
     http_timeout: float = 90.0
     enable_scheduler: bool = False  # bật để chạy connector định kỳ trong tiến trình API
+
+    # Phân quyền (GĐ 5). Mật khẩu đặt trong .env (xem .env.example); để trống = tắt tài khoản đó.
+    session_secret: str | None = None  # khoá ký cookie phiên; để trống → sinh ngẫu nhiên mỗi lần khởi động
+    session_hours: int = 12
+    admin_password: str | None = None
+    analyst_password: str | None = None
+    # Chế độ demo (Vercel): cho phép "Xem với vai trò…" không cần mật khẩu
+    demo_mode: bool = False
 
 
 settings = Settings()

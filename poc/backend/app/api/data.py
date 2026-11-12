@@ -10,6 +10,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.analytics import effective_data_status, origin_label
+from app.auth import ADMIN, User, require_admin
 from app.config import settings
 from app.connectors import REGISTRY
 from app.datapoints import review_points
@@ -50,14 +52,15 @@ def _submission_out(s: Submission) -> dict:
 # ---------------------------------------------------------------- nộp số liệu
 @router.post("/submissions")
 async def upload_submission(file: UploadFile = File(...), submitted_by: str | None = Form(None),
-                            session: Session = Depends(get_session)):
+                            session: Session = Depends(get_session), user: User = Depends(require_admin)):
+    submitted_by = user.name  # người nộp lấy từ phiên đăng nhập, không lấy từ form
     if not (file.filename or "").lower().endswith(".xlsx"):
         raise HTTPException(400, "Chỉ nhận file Excel .xlsx theo template")
     sub = ingest_template(session, await _read_upload(file), file.filename, submitted_by)
     return _submission_out(sub)
 
 
-@router.post("/documents")
+@router.post("/documents", dependencies=[Depends(require_admin)])
 async def upload_document(file: UploadFile = File(...), indicator_code: str = Form(...),
                           period: str | None = Form(None), source_url: str | None = Form(None),
                           submitted_by: str | None = Form(None), session: Session = Depends(get_session)):
@@ -71,13 +74,13 @@ async def upload_document(file: UploadFile = File(...), indicator_code: str = Fo
     return _submission_out(sub)
 
 
-@router.get("/submissions")
+@router.get("/submissions", dependencies=[Depends(require_admin)])
 def list_submissions(limit: int = 50, session: Session = Depends(get_session)):
     subs = session.scalars(select(Submission).order_by(Submission.id.desc()).limit(limit))
     return [_submission_out(s) for s in subs]
 
 
-@router.get("/submissions/{sub_id}")
+@router.get("/submissions/{sub_id}", dependencies=[Depends(require_admin)])
 def get_submission(sub_id: int, session: Session = Depends(get_session)):
     s = session.get(Submission, sub_id)
     if not s:
@@ -97,7 +100,7 @@ def _run_out(r: CrawlRun | None) -> dict | None:
             "started_at": r.started_at, "finished_at": r.finished_at, "stats": r.stats or {}, "error": r.error}
 
 
-@router.get("/connectors")
+@router.get("/connectors", dependencies=[Depends(require_admin)])
 def list_connectors(session: Session = Depends(get_session)):
     out = []
     for name, c in REGISTRY.items():
@@ -110,7 +113,7 @@ def list_connectors(session: Session = Depends(get_session)):
     return out
 
 
-@router.post("/connectors/{name}/run")
+@router.post("/connectors/{name}/run", dependencies=[Depends(require_admin)])
 def run_connector_now(name: str, session: Session = Depends(get_session)):
     from app.connectors.runner import run_connector
 
@@ -119,7 +122,7 @@ def run_connector_now(name: str, session: Session = Depends(get_session)):
     return _run_out(run_connector(session, name, trigger="manual"))
 
 
-@router.get("/crawl-runs")
+@router.get("/crawl-runs", dependencies=[Depends(require_admin)])
 def list_runs(connector: str | None = None, limit: int = 30, session: Session = Depends(get_session)):
     q = select(CrawlRun).order_by(CrawlRun.id.desc()).limit(limit)
     if connector:
@@ -137,6 +140,8 @@ def _point_out(p: DataPoint, published_ref: DataPoint | None = None) -> dict:
         "warnings": p.warnings or [], "meta": p.meta or {}, "is_current": p.is_current,
         "evidence_file_id": p.evidence_file_id, "crawl_run_id": p.crawl_run_id, "submission_id": p.submission_id,
         "created_at": p.created_at,
+        "data_status": effective_data_status(p), "is_simulated": bool(p.is_simulated),
+        "period_type": p.period_type, "region_code": p.region_code, "origin_label": origin_label(p.origin),
     }
     if published_ref is not None:
         out["compare"] = {"origin": published_ref.origin, "value": published_ref.value, "id": published_ref.id,
@@ -145,11 +150,14 @@ def _point_out(p: DataPoint, published_ref: DataPoint | None = None) -> dict:
     return out
 
 
-@router.get("/review")
+@router.get("/review", dependencies=[Depends(require_admin)])
 def review_queue(
     status: DataStatus = DataStatus.NEEDS_REVIEW,
     indicator: str | None = None,
     origin: str | None = None,
+    kind: str | None = Query(None, pattern="^(agency|crawler|doc|external|calc)$",
+                             description="Loại nguồn: agency, crawler, doc, external, calc"),
+    warnings_only: bool = False,
     geography: str | None = Query(None, description="'Toàn quốc' hoặc tên tỉnh; '*' = tất cả"),
     crawl_run_id: int | None = None,
     submission_id: int | None = None,
@@ -162,14 +170,21 @@ def review_queue(
         q = q.join(Indicator).where(Indicator.code == indicator)
     if origin:
         q = q.where(DataPoint.origin == origin)
+    if kind:
+        q = q.where(DataPoint.origin.startswith(f"{kind}:"))
     if geography and geography != "*":
         q = q.where(DataPoint.geography == geography)
     if crawl_run_id:
         q = q.where(DataPoint.crawl_run_id == crawl_run_id)
     if submission_id:
         q = q.where(DataPoint.submission_id == submission_id)
-    total = session.scalar(select(func.count()).select_from(q.order_by(None).subquery()))
-    points = session.scalars(q.order_by(DataPoint.indicator_id, DataPoint.period.desc(), DataPoint.id).limit(limit)).all()
+    ordered = q.order_by(DataPoint.indicator_id, DataPoint.period.desc(), DataPoint.id)
+    if warnings_only:  # cột warnings là JSON → lọc trong Python
+        matched = [p for p in session.scalars(ordered) if p.warnings]
+        total, points = len(matched), matched[:limit]
+    else:
+        total = session.scalar(select(func.count()).select_from(q.order_by(None).subquery()))
+        points = session.scalars(ordered.limit(limit)).all()
 
     # giá trị đã công bố từ nguồn KHÁC cùng khoá để người duyệt đối chiếu
     refs: dict[tuple, list[DataPoint]] = {}
@@ -189,7 +204,7 @@ def review_queue(
     return {"total": total, "items": items}
 
 
-@router.get("/review/summary")
+@router.get("/review/summary", dependencies=[Depends(require_admin)])
 def review_summary(session: Session = Depends(get_session)):
     rows = session.execute(
         select(DataPoint.status, DataPoint.origin, func.count())
@@ -200,28 +215,28 @@ def review_summary(session: Session = Depends(get_session)):
         by_status[status.value] += n
         by_origin.setdefault(origin, {})[status.value] = n
     indicators = session.scalar(select(func.count(func.distinct(DataPoint.indicator_id))).where(
-        DataPoint.is_current.is_(True), DataPoint.status == DataStatus.PUBLISHED))
+        DataPoint.is_current.is_(True), DataPoint.status == DataStatus.PUBLISHED, DataPoint.value.is_not(None)))
     return {"by_status": dict(by_status), "by_origin": by_origin, "indicators_with_published_data": indicators}
 
 
 class ReviewAction(BaseModel):
     ids: list[int] = Field(min_length=1, max_length=2000)
-    action: str = Field(pattern="^(approve|reject)$")
-    reviewer: str = Field(min_length=1, max_length=255)
+    action: str = Field(pattern="^(approve|reject|reopen)$")
+    reviewer: str | None = Field(None, max_length=255)  # bỏ qua: người duyệt lấy từ phiên đăng nhập
     note: str | None = Field(None, max_length=2000)
 
 
 @router.post("/review/actions")
-def review_action(body: ReviewAction, session: Session = Depends(get_session)):
+def review_action(body: ReviewAction, session: Session = Depends(get_session), user: User = Depends(require_admin)):
     try:
-        return review_points(session, body.ids, body.action, body.reviewer.strip(), body.note)
+        return review_points(session, body.ids, body.action, user.name, body.note)
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
 
 
 @router.get("/data-points/{point_id}/history")
 def point_history(point_id: int, session: Session = Depends(get_session)):
-    p = session.get(DataPoint, point_id)
+    p = session.scalar(select(DataPoint).where(DataPoint.id == point_id))  # select (không dùng get) để áp bộ lọc vai trò
     if not p:
         raise HTTPException(404, "Không tìm thấy điểm dữ liệu")
     logs = session.scalars(select(ReviewLog).where(ReviewLog.data_point_id == point_id).order_by(ReviewLog.id))
@@ -256,7 +271,14 @@ def indicator_data(code: str, status: DataStatus | None = None, geography: str |
 # ---------------------------------------------------------------- minh chứng
 @router.get("/evidence/{ev_id}")
 def get_evidence(ev_id: int, session: Session = Depends(get_session)):
-    ev = session.get(EvidenceFile, ev_id)
+    ev = session.scalar(select(EvidenceFile).where(EvidenceFile.id == ev_id))
+    role = session.info.get("role")
+    if ev and role not in (None, ADMIN):
+        # chỉ mở minh chứng của số liệu người gọi được xem (bộ lọc vai trò áp lên DataPoint),
+        # hoặc minh chứng chấm điểm chương trình (khu nội bộ, từ Analyst)
+        linked = session.scalar(select(DataPoint.id).where(DataPoint.evidence_file_id == ev.id).limit(1))
+        if not linked and not (ev.case_score_id and role != "public"):
+            ev = None
     if not ev:
         raise HTTPException(404, "Không tìm thấy file minh chứng")
     data = get_storage().get(ev.file_key)

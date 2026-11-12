@@ -3,94 +3,285 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Innovation Hub – Nộp số liệu</title>
+<title>Nhập dữ liệu – Dữ liệu Đổi mới sáng tạo</title>
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/common.js"></script>
+<script src="/static/illus.js"></script>
+<style>
+  .summary { display: grid; grid-template-columns: auto 1fr auto; gap: 18px; align-items: center; padding: 22px; }
+  .summary h2 { margin: 0; font-size: 22px; letter-spacing: -.02em; }
+  .summary p { margin: 2px 0 0; color: var(--text-2); }
+  .summary.err { border-color: #FECDCA; background: linear-gradient(180deg, #FFF7F6, #fff); }
+  .summary.ok { border-color: #ABEFC6; background: linear-gradient(180deg, #F3FEF7, #fff); }
+  .cell-col { display: inline-grid; place-items: center; min-width: 26px; height: 24px; border-radius: 6px; background: var(--err-soft); color: var(--err); font: 600 12px var(--mono); }
+  .tpl { display: flex; align-items: center; gap: 14px; padding: 16px 18px; }
+  .tips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
+  .tip { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--text-2); padding: 12px; border-radius: 12px; background: var(--surface-2); }
+  .tip svg.i { color: var(--primary); }
+  .rel { display: flex; gap: 14px; align-items: center; padding: 16px 18px; margin-bottom: 14px; }
+  .rel .big-ic { background: var(--primary-soft); color: var(--primary); }
+  .dstats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 14px 0; }
+  .dstats .stat .v { font-size: 26px; }
+  @media (max-width: 760px) { .dstats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .chgt td { font-size: 13px; vertical-align: middle; }
+  .chgt td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .kind { display: inline-flex; height: 22px; align-items: center; padding: 0 8px; border-radius: 6px; font-size: 11.5px; font-weight: 600; }
+  .kind.new { background: var(--ok-soft); color: var(--ok); } .kind.updated { background: var(--warn-soft); color: var(--warn); } .kind.removed { background: var(--err-soft); color: var(--err); }
+  .pbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin: 12px 0; }
+  .pbar .btns { display: flex; gap: 8px; }
+  .topseg { margin-bottom: 16px; }
+  @media (max-width: 760px) { .summary { grid-template-columns: auto 1fr; } .summary .btns { grid-column: 1 / -1; } .tips { grid-template-columns: 1fr; } }
+</style>
 </head>
 <body>
 <main>
-  <div class="grid2">
-    <section class="card">
-      <h2 class="section" style="margin-top:0">1. Nộp file theo template</h2>
-      <p class="muted small">Tải template, điền số liệu, rồi kéo thả file .xlsx vào đây. Hệ thống kiểm tra từng dòng; file có lỗi sẽ không được nhập.</p>
-      <p><span id="tpl" class="muted small">Đang tải…</span></p>
-      <div class="dropzone" id="dz">Kéo thả file <b>.xlsx</b> vào đây hoặc
-        <label class="btn" style="margin-left:6px">Chọn file<input id="xlsx" type="file" accept=".xlsx" hidden></label>
+  <div class="topseg" id="paneWrap"></div>
+
+  <!-- ============ File tổng hợp của Cục (GĐ 5) ============ -->
+  <section id="pane-cuc">
+    <div class="card rel" id="relCur"></div>
+    <div id="cucPick">
+      <div class="dropzone" id="dz2">
+        <div id="dz2Ic"></div>
+        <div><b>Kéo thả file tổng hợp của Cục (.xlsx)</b></div>
+        <div class="small muted">Cùng cấu trúc với file seed: các sheet dim_indicator, fact_observation, chart_data…</div>
+        <div style="height:12px"></div>
+        <label class="btn primary"><span id="pick2Ic"></span>Chọn file<input id="cucFile" type="file" accept=".xlsx" hidden></label>
       </div>
-    </section>
-    <section class="card">
-      <h2 class="section" style="margin-top:0">2. Trích số liệu từ tài liệu (Doc-ETL)</h2>
-      <p class="muted small">Báo cáo PDF/HTML/TXT chưa có cấu trúc. Hệ thống tìm số liệu cho chỉ tiêu đã chọn, kèm đoạn trích để người duyệt đối chiếu.</p>
-      <form id="docForm" class="edit">
-        <label class="full">Chỉ tiêu<select class="field" name="indicator_code" id="docInd" required></select></label>
-        <label>Kỳ mặc định (năm)<input class="field" name="period" placeholder="tự nhận diện nếu bỏ trống" pattern="20\d\d"></label>
-        <label>Link gốc của tài liệu<input class="field" name="source_url" type="url" placeholder="https://…"></label>
-        <label class="full">Tài liệu (.pdf, .html, .txt)<input class="field" name="file" type="file" accept=".pdf,.html,.htm,.txt" required></label>
-        <div class="full"><button class="btn primary" id="docBtn">Trích xuất</button></div>
-      </form>
-    </section>
+    </div>
+    <div id="preview" hidden></div>
+    <h2 class="section">Các lần nhập</h2>
+    <div class="table-wrap"><table><thead><tr><th style="width:56px">#</th><th>File</th><th>Người nhập</th><th class="hide-sm">Số liệu</th><th class="hide-sm">Thời gian</th></tr></thead><tbody id="rels"></tbody></table></div>
+  </section>
+
+  <!-- ============ Biểu mẫu theo chỉ tiêu (luồng cũ) ============ -->
+  <section id="pane-form" hidden>
+  <div class="tabs-bar" role="tablist">
+    <button class="on" data-tab="tpl">Theo mẫu Excel</button>
+    <button data-tab="doc">Từ tài liệu</button>
   </div>
 
-  <section id="result"></section>
+  <!-- ============ Nộp theo mẫu ============ -->
+  <section id="tab-tpl">
+    <div class="stepper glass" id="stepper"></div>
+
+    <div id="step1">
+      <div class="card tpl"><span class="big-ic" style="background:var(--primary-soft);color:var(--primary)"></span>
+        <div style="flex:1;min-width:0"><b id="tplTitle">Mẫu báo cáo</b><div class="small muted" id="tplMeta"></div></div>
+        <a class="btn" id="tplBtn"></a></div>
+      <div class="tips">
+        <div class="tip"><span class="ti"></span>Không thay đổi cấu trúc biểu mẫu</div>
+        <div class="tip"><span class="ti"></span>Chọn từ danh sách</div>
+        <div class="tip"><span class="ti"></span>Chưa có số liệu: để trống</div>
+      </div>
+      <div class="dropzone" id="dz" style="margin-top:16px">
+        <div id="dzIc"></div>
+        <div><b>Kéo thả file .xlsx</b></div>
+        <div style="height:12px"></div>
+        <label class="btn primary"><span id="pickIc"></span>Chọn file<input id="xlsx" type="file" accept=".xlsx" hidden></label>
+      </div>
+    </div>
+
+    <div id="result" hidden></div>
+  </section>
+
+  <!-- ============ Trích từ tài liệu ============ -->
+  <section id="tab-doc" hidden>
+    <div class="card">
+      <form id="docForm" class="edit">
+        <label class="full">Chỉ tiêu<select class="field" name="indicator_code" id="docInd" required></select></label>
+        <label>Năm mặc định<input class="field" name="period" placeholder="Tự nhận diện" pattern="20\d\d"></label>
+        <label>Link gốc<input class="field" name="source_url" type="url" placeholder="https://…"></label>
+        <label class="full">Tài liệu (.pdf, .html, .txt)<input class="field" name="file" type="file" accept=".pdf,.html,.htm,.txt" required></label>
+        <div class="full"><button class="btn primary" id="docBtn"><span id="docIc"></span>Trích xuất</button></div>
+      </form>
+    </div>
+    <div id="docResult"></div>
+  </section>
 
   <h2 class="section">Lượt nộp gần đây</h2>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>#</th><th>File</th><th>Loại</th><th>Trạng thái</th><th class="hide-sm">Đơn vị / chỉ tiêu</th><th>Kết quả</th><th class="hide-sm">Thời gian</th></tr></thead>
+      <thead><tr><th style="width:56px">#</th><th>File</th><th>Trạng thái</th><th class="hide-sm">Đơn vị / chỉ tiêu</th><th class="hide-sm">Thời gian</th></tr></thead>
       <tbody id="subs"></tbody>
     </table>
   </div>
+  </section>
 </main>
 <script>
 renderHeader("/upload");
+// ---------------- chọn luồng nhập
+$("paneWrap").innerHTML = segHtml("pane", [["cuc", "File tổng hợp của Cục"], ["form", "Biểu mẫu theo chỉ tiêu"]], location.hash === "#form" ? "form" : "cuc", "Cách nhập dữ liệu");
+const showPane = (v) => { $("pane-cuc").hidden = v !== "cuc"; $("pane-form").hidden = v !== "form"; history.replaceState(null, "", v === "form" ? "#form" : location.pathname); };
+onSeg("pane", showPane); showPane(location.hash === "#form" ? "form" : "cuc");
+
+// ---------------- file tổng hợp của Cục: tải lên → xem khác biệt → công bố
+const KIND = { new: "Mới", updated: "Thay đổi", removed: "Bỏ" };
+const day2 = (t) => t ? new Date(t + (String(t).endsWith("Z") ? "" : "Z")).toLocaleString("vi-VN", { dateStyle: "short", timeStyle: "short" }) : "";
+let pv = null, pvFilter = "";
+$("dz2Ic").innerHTML = ILLUS.upload({ w: 170 }); $("pick2Ic").innerHTML = ic("upload");
+async function loadReleases() {
+  const rs = await api("/api/admin/releases");
+  const c = rs[0];
+  $("relCur").innerHTML = `<span class="big-ic">${ic("file")}</span><div style="flex:1;min-width:0">${c
+    ? `<b>Bản đang dùng: ${esc(c.file_name)}</b><div class="small muted">Nhập ${esc(day2(c.created_at))} · ${esc(c.imported_by || "–")}</div>`
+    : "<b>Chưa nhập file tổng hợp của Cục</b>"}</div>`;
+  $("rels").innerHTML = rs.map((r) => `<tr><td class="small">${r.id}</td><td>${esc(r.file_name)}</td><td class="small">${esc(r.imported_by || "–")}</td>
+    <td class="hide-sm small">${Object.entries((r.stats || {}).observations || {}).map(([k, n]) => `${({ new: "mới", updated: "đổi", unchanged: "giữ", removed: "bỏ" })[k] || k} ${n}`).join(" · ")}</td>
+    <td class="hide-sm small">${esc(day2(r.created_at))}</td></tr>`).join("") || `<tr><td colspan="5">${emptyState("Chưa có lần nhập nào")}</td></tr>`;
+}
+function renderPreview() {
+  const o = pv.observations || {}, rows = pv.changes.filter((c) => !pvFilter || c.kind === pvFilter);
+  const nv = (v, t) => v == null ? (t ? `<span class="small muted">${esc(t)}</span>` : "–") : fmt(v, 4);
+  const diff = (c) => c.kind === "updated" && c.old != null && c.new != null && c.old !== 0 ? `${c.new > c.old ? "+" : ""}${fmt((c.new - c.old) / Math.abs(c.old) * 100, Math.abs((c.new - c.old) / c.old) < .01 ? 2 : 1)}%` : "";
+  $("preview").innerHTML = `
+    ${pv.same_as_current ? `<div class="infobox">${ic("info")}<span>File trùng với bản đang dùng; công bố lại không thay đổi số liệu.</span></div>` : ""}
+    <div class="pbar"><div><b>${esc(pv.file_name)}</b><div class="small muted">Kiểm tra cấu trúc: đạt · chưa ghi vào hệ thống</div></div>
+      <div class="btns"><button class="btn" id="pvCancel">${ic("x")}Huỷ</button><button class="btn primary" id="pvPub">${ic("check")}Công bố</button></div></div>
+    <section class="dstats">${[["new", "Số liệu mới"], ["updated", "Thay đổi giá trị"], ["removed", "Bỏ (không còn trong file)"], ["unchanged", "Giữ nguyên"]].map(([k, l]) =>
+      `<div class="stat"><span class="l">${l}</span><span class="v">${(o[k] || 0).toLocaleString("vi-VN")}</span></div>`).join("")}</section>
+    ${pv.warnings.length ? `<details class="card" style="margin-bottom:12px"><summary>${ic("alert")} ${pv.warnings.length} cảnh báo khi đọc file</summary><ul class="small">${pv.warnings.slice(0, 50).map((w) => `<li>${esc(w)}</li>`).join("")}</ul></details>` : ""}
+    <div class="pbar"><span id="kfWrap"></span><span class="small muted">${pv.changes_truncated ? `Hiển thị ${pv.changes.length} dòng khác biệt đầu tiên` : `${pv.changes.length} dòng khác biệt`}</span></div>
+    <div class="table-wrap"><table class="chgt"><thead><tr><th>Loại</th><th>Chỉ tiêu</th><th>Kỳ</th><th class="hide-sm">Địa bàn</th><th class="hide-sm">Phân tổ</th><th class="num">Đang dùng</th><th class="num">Trong file mới</th><th class="num hide-sm">Chênh</th></tr></thead><tbody>${
+      rows.map((c) => `<tr><td><span class="kind ${c.kind}">${KIND[c.kind]}</span></td><td><span class="code">${esc(c.indicator_code)}</span>${c.simulated ? " " + simBadge() : ""}</td>
+        <td class="small">${esc(c.period)}</td><td class="hide-sm small">${esc(c.region || "")}</td><td class="hide-sm small">${esc(c.breakdown || "")}</td>
+        <td class="num">${c.kind === "new" ? "–" : nv(c.old, c.old_text)}</td><td class="num">${c.kind === "removed" ? "–" : `<b>${nv(c.new, c.new_text)}</b>`}</td><td class="num hide-sm small">${diff(c)}</td></tr>`).join("")
+      || `<tr><td colspan="8">${emptyState("Không có khác biệt so với bản đang dùng", "check")}</td></tr>`}</tbody></table></div>`;
+  $("kfWrap").innerHTML = segHtml("kf", [["", "Tất cả"], ["updated", "Thay đổi"], ["new", "Mới"], ["removed", "Bỏ"]], pvFilter, "Lọc khác biệt");
+  onSeg("kf", (v) => { pvFilter = v; renderPreview(); });
+  $("pvCancel").onclick = () => { pv = null; $("preview").hidden = true; $("cucPick").hidden = false; $("cucFile").value = ""; };
+  $("pvPub").onclick = publish;
+}
+async function previewFile(file) {
+  if (!file) return;
+  if (!/\.xlsx$/i.test(file.name)) return toast("Chỉ nhận file .xlsx", { type: "err" });
+  const fd = new FormData(); fd.append("file", file);
+  $("cucPick").hidden = true; $("preview").hidden = false;
+  $("preview").innerHTML = `<div class="card" style="display:flex;gap:10px;align-items:center">${ic("clock")}Đang kiểm tra cấu trúc và so sánh với bản đang dùng…</div>`;
+  try { pv = await api("/api/admin/releases/preview", { method: "POST", body: fd }); pvFilter = ""; renderPreview(); }
+  catch (e) { $("preview").hidden = true; $("cucPick").hidden = false; $("cucFile").value = ""; toast(e.message, { type: "err" }); }
+}
+async function publish() {
+  const o = pv.observations || {};
+  const v = await formDialog({ title: "Công bố file tổng hợp?", icon: "upload", okLabel: "Công bố",
+    message: `${(o.new || 0) + (o.updated || 0)} số liệu mới hoặc thay đổi, ${o.removed || 0} số bị bỏ. Số liệu từ file của Cục được công bố ngay và ghi vào Nhật ký.`,
+    fields: [{ name: "note", label: "Ghi chú (văn bản, ngày Cục gửi…)", type: "textarea" }] });
+  if (!v) return;
+  try {
+    const r = await api(`/api/admin/releases/${pv.token}/publish`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ note: v.note }) });
+    toast(`Đã công bố bản nhập #${r.release_id}`);
+    pv = null; $("preview").hidden = true; $("cucPick").hidden = false; $("cucFile").value = "";
+    loadReleases();
+  } catch (e) { toast(e.message, { type: "err" }); }
+}
+$("cucFile").onchange = () => previewFile($("cucFile").files[0]);
+const dz2 = $("dz2");
+["dragenter", "dragover"].forEach((t) => dz2.addEventListener(t, (e) => { e.preventDefault(); dz2.classList.add("drag"); }));
+["dragleave", "drop"].forEach((t) => dz2.addEventListener(t, (e) => { e.preventDefault(); dz2.classList.remove("drag"); }));
+dz2.addEventListener("drop", (e) => previewFile(e.dataTransfer.files[0]));
+loadReleases().catch((e) => toast(e.message, { type: "err" }));
+
+// ---------------- biểu mẫu theo chỉ tiêu
+document.querySelector(".tpl .big-ic").innerHTML = ic("file");
+$("dzIc").innerHTML = ILLUS.upload({ w: 190 }); $("pickIc").innerHTML = ic("upload"); $("docIc").innerHTML = ic("spark");
+document.querySelectorAll(".tip .ti").forEach((t, i) => t.innerHTML = ic(["alert", "list", "info"][i]));
+$("subs").innerHTML = skeletonRows(3, 5);
+
+function stepper(n) {
+  const steps = ["Tải mẫu", "Tải lên", "Kết quả"];
+  $("stepper").innerHTML = steps.map((s, i) => `${i ? `<div class="step-line ${i < n ? "done" : ""}"></div>` : ""}<div class="step ${i + 1 < n ? "done" : i + 1 === n ? "cur" : ""}"><span class="n">${i + 1 < n ? ic("check") : i + 1}</span>${s}</div>`).join("");
+}
+stepper(1);
+
+// tab
+document.querySelectorAll(".tabs-bar button").forEach((b) => b.onclick = () => {
+  document.querySelectorAll(".tabs-bar button").forEach((x) => x.classList.toggle("on", x === b));
+  $("tab-tpl").hidden = b.dataset.tab !== "tpl"; $("tab-doc").hidden = b.dataset.tab !== "doc";
+});
 
 async function init() {
   const [tpls, inds] = await Promise.all([api("/api/templates"), api("/api/indicators?framework=QD2244")]);
-  $("tpl").innerHTML = tpls.length ? `<a class="btn" href="${tpls[0].download_url}">⬇ ${esc(tpls[0].title)}</a>` : "Chưa sinh template";
+  if (tpls.length) {
+    const t = tpls[0];
+    $("tplTitle").textContent = `Mẫu ${t.indicators.join(" + ")}`;
+    $("tplMeta").innerHTML = `${esc(t.title)} · <span class="code">${esc(t.file_name)}</span>`;
+    $("tplBtn").href = t.download_url; $("tplBtn").innerHTML = ic("download") + "Tải mẫu";
+  } else { $("tplMeta").textContent = "Chưa sinh template"; $("tplBtn").hidden = true; }
   $("docInd").innerHTML = inds.map((i) => `<option value="${esc(i.code)}" ${i.code === "0425" ? "selected" : ""}>${esc(i.code)} – ${esc(i.name)}</option>`).join("");
   loadSubs();
 }
 
 function resultHtml(s) {
   const sm = s.summary || {}, info = sm.info || {};
-  const head = `<h2 class="section">Kết quả lượt nộp #${s.id}: ${esc(s.file_name)} ${status(s.status)}</h2>`;
-  let body = "";
   if (s.status === "validation_failed") {
     const rows = new Set(s.errors.filter((e) => e.row).map((e) => e.sheet + ":" + e.row)).size;
-    body += `<div class="errbox">File <b>chưa được nhập</b>: ${s.errors.length} lỗi${rows ? ` ở ${rows} dòng` : ""}. Sửa trong file rồi nộp lại.</div>`;
-  } else if (s.kind === "template") {
-    body += `<div class="okbox">Đã nhập <b>${sm.rows}</b> dòng của <b>${esc(info.name || "")}</b> (chỉ tiêu ${esc((sm.indicators || []).join(", "))}, năm ${esc((sm.periods || []).join(", "))}): ${sm.new || 0} mới, ${sm.updated || 0} cập nhật, ${sm.unchanged || 0} không đổi. Số liệu ở trạng thái <b>chờ duyệt</b>. <a href="/review?submission_id=${s.id}">Mở hàng đợi duyệt →</a></div>`;
-  } else {
-    body += sm.candidates ? `<div class="okbox">Tìm thấy <b>${sm.candidates}</b> giá trị ứng viên cho chỉ tiêu ${esc(sm.indicator)}. <a href="/review?submission_id=${s.id}">Xem và duyệt →</a></div>` : "";
+    const bySheet = {};
+    s.errors.forEach((e) => { const k = e.sheet || "Chung"; bySheet[k] = (bySheet[k] || 0) + 1; });
+    return `<div class="card summary err">
+        <span class="big-ic" style="background:var(--err-soft);color:var(--err)">${ic("xc")}</span>
+        <div><h2>${s.errors.length} lỗi cần sửa</h2><p>File chưa được nhập${rows ? ` · ${rows} dòng` : ""}.</p></div>
+        <div class="btns" style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" onclick="reset()">${ic("refresh")}Chọn file khác</button><label class="btn primary">${ic("upload")}Nộp lại<input type="file" accept=".xlsx" hidden onchange="uploadXlsx(this.files[0])"></label></div></div>
+      <div class="chips">${Object.entries(bySheet).map(([k, n]) => `<span class="chip"><span class="code">${esc(k)}</span><b>${n}</b></span>`).join("")}</div>
+      ${issueTable(s.errors.map((e) => ({ ...e, level: "error" })).concat(s.warnings.map((w) => ({ ...w, level: "warning" }))))}`;
   }
-  const issues = [...s.errors.map((e) => ({ ...e, level: "error" })), ...s.warnings.map((w) => ({ ...w, level: "warning" }))];
-  if (issues.length) body += `<div class="table-wrap"><table><thead><tr><th>Mức</th><th>Sheet</th><th>Dòng</th><th>Cột</th><th>Giá trị</th><th>Nội dung</th></tr></thead><tbody>${
-    issues.map((i) => `<tr><td>${i.level === "error" ? '<span class="status st-failed">Lỗi</span>' : '<span class="status st-needs_review">Cảnh báo</span>'}</td><td>${esc(i.sheet || "")}</td><td>${esc(i.row || "")}</td><td>${esc(i.column || "")}</td><td class="small">${esc(i.value || "")}</td><td>${esc(i.message)}</td></tr>`).join("")
-  }</tbody></table></div>`;
-  return head + body;
+  if (s.kind === "template") {
+    return `<div class="card summary ok">
+        <span class="big-ic" style="background:var(--ok-soft);color:var(--ok)">${ic("ok")}</span>
+        <div><h2>Đã nhận ${sm.rows} dòng</h2><p>${esc(info.name || "")} · chờ duyệt</p></div>
+        <div class="btns" style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" onclick="reset()">${ic("upload")}Nộp file khác</button><a class="btn primary" href="/review?submission_id=${s.id}">Xem hàng chờ ${ic("arrow")}</a></div></div>
+      <div class="stats" style="margin-top:14px">
+        <div class="stat"><span class="l">Chỉ tiêu</span><span class="v" style="font-size:24px">${(sm.indicators || []).map((c) => `<span class="code" style="font-size:14px">${esc(c)}</span>`).join(" ")}</span></div>
+        <div class="stat"><span class="l">Năm</span><span class="v" style="font-size:24px">${esc((sm.periods || []).join(", "))}</span></div>
+        <div class="stat"><span class="l">Mới · đổi · giữ nguyên</span><span class="v" style="font-size:24px">${sm.new || 0} · ${sm.updated || 0} · ${sm.unchanged || 0}</span></div>
+      </div>
+      ${s.warnings.length ? issueTable(s.warnings.map((w) => ({ ...w, level: "warning" }))) : ""}`;
+  }
+  return `<div class="card summary ${sm.candidates ? "ok" : ""}">
+      <span class="big-ic" style="background:${sm.candidates ? "var(--ok-soft);color:var(--ok)" : "var(--surface-2);color:var(--text-3)"}">${ic(sm.candidates ? "spark" : "inbox")}</span>
+      <div><h2>${sm.candidates ? `${sm.candidates} giá trị tìm thấy` : "Không tìm thấy số liệu"}</h2><p>Chỉ tiêu ${esc(sm.indicator || "")} · chờ duyệt</p></div>
+      <div class="btns">${sm.candidates ? `<a class="btn primary" href="/review?submission_id=${s.id}">Xem & duyệt ${ic("arrow")}</a>` : ""}</div></div>
+    ${s.errors.length ? issueTable(s.errors) : ""}`;
 }
 
-async function loadSubs() {
-  const subs = await api("/api/submissions?limit=30");
-  $("subs").innerHTML = subs.map((s) => {
-    const sm = s.summary || {};
-    const what = s.kind === "template" ? esc((sm.info || {}).name || "") : `Chỉ tiêu ${esc(sm.indicator || "")}`;
-    const res = s.status === "validation_failed" ? `<span class="err-text">${s.errors.length} lỗi</span>`
-      : s.kind === "template" ? `${sm.rows || 0} dòng` : `${sm.candidates || 0} ứng viên`;
-    return `<tr class="click" onclick="showSub(${s.id})"><td>${s.id}</td><td>${esc(s.file_name)}</td><td>${s.kind === "template" ? "Template" : "Doc-ETL"}</td><td>${status(s.status)}</td><td class="hide-sm">${what}</td><td>${res}${s.warnings.length ? ` · <span class="warn-text">${s.warnings.length} cảnh báo</span>` : ""}</td><td class="hide-sm small">${when(s.created_at)}</td></tr>`;
-  }).join("") || '<tr><td colspan="7" class="muted">Chưa có lượt nộp nào.</td></tr>';
+function issueTable(issues) {
+  if (!issues.length) return "";
+  return `<div class="table-wrap" style="margin-top:14px"><table>
+    <thead><tr><th style="width:150px">Vị trí</th><th style="width:64px">Cột</th><th>Nội dung</th><th class="hide-sm">Giá trị</th></tr></thead><tbody>${
+    issues.map((i) => `<tr><td>${i.level === "error" ? `<span class="err-text">${ic("xc")}</span>` : `<span class="warn-text">${ic("alert")}</span>`} <span class="code">${esc((i.sheet || "").split("_")[0] || "–")}</span>${i.row ? ` · <b>${i.row}</b>` : ""}</td>
+      <td>${i.column ? `<span class="cell-col">${esc(i.column)}</span>` : ""}</td><td>${esc(i.message)}</td><td class="hide-sm small muted">${esc(i.value || "–")}</td></tr>`).join("")}</tbody></table></div>`;
 }
 
-async function showSub(id) { $("result").innerHTML = resultHtml(await api("/api/submissions/" + id)); $("result").scrollIntoView({ behavior: "smooth" }); }
+function reset() { $("result").hidden = true; $("step1").hidden = false; stepper(1); $("xlsx").value = ""; }
 
 async function uploadXlsx(file) {
   if (!file) return;
+  stepper(2);
+  $("step1").hidden = true; $("result").hidden = false;
+  $("result").innerHTML = `<div class="card summary"><span class="big-ic" style="background:var(--primary-soft);color:var(--primary)">${ic("refresh")}</span><div><h2>Đang kiểm tra…</h2><p class="code">${esc(file.name)}</p></div></div>`;
   const fd = new FormData(); fd.append("file", file);
   const n = reviewerName(); if (n) fd.append("submitted_by", n);
-  $("result").innerHTML = `<p class="muted">Đang kiểm tra ${esc(file.name)}…</p>`;
-  try { $("result").innerHTML = resultHtml(await api("/api/submissions", { method: "POST", body: fd })); }
-  catch (e) { $("result").innerHTML = `<div class="errbox">${esc(e.message)}</div>`; }
+  try { $("result").innerHTML = resultHtml(await api("/api/submissions", { method: "POST", body: fd })); stepper(3); }
+  catch (e) { $("result").innerHTML = `<div class="errbox">${ic("xc")}<span>${esc(e.message)}</span></div><button class="btn" onclick="reset()">Thử lại</button>`; }
   loadSubs();
+}
+
+async function loadSubs() {
+  const subs = await api("/api/submissions?limit=20");
+  $("subs").innerHTML = subs.map((s) => {
+    const sm = s.summary || {};
+    const what = s.kind === "template" ? esc((sm.info || {}).name || "") : `Tài liệu · ${esc(sm.indicator || "")}`;
+    return `<tr class="click" onclick="showSub(${s.id})"><td><span class="code">${s.id}</span></td><td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s.file_name)}">${esc(s.file_name)}</td>
+      <td>${status(s.status)}</td><td class="hide-sm">${what}</td><td class="hide-sm small muted">${when(s.created_at)}</td></tr>`;
+  }).join("") || `<tr><td colspan="5">${emptyState("Chưa có lượt nộp nào")}</td></tr>`;
+}
+
+async function showSub(id) {
+  const s = await api("/api/submissions/" + id);
+  $("pane").querySelector('[data-v="form"]').click();
+  document.querySelector('.tabs-bar button[data-tab="tpl"]').click();
+  $("step1").hidden = true; $("result").hidden = false; stepper(3);
+  $("result").innerHTML = resultHtml(s);
+  scrollTo({ top: 0, behavior: "smooth" });
 }
 
 $("xlsx").addEventListener("change", (e) => uploadXlsx(e.target.files[0]));
@@ -104,14 +295,14 @@ $("docForm").addEventListener("submit", async (e) => {
   const fd = new FormData(e.target);
   for (const k of ["period", "source_url"]) if (!fd.get(k)) fd.delete(k);
   $("docBtn").disabled = true;
-  $("result").innerHTML = '<p class="muted">Đang đọc tài liệu…</p>';
-  try { $("result").innerHTML = resultHtml(await api("/api/documents", { method: "POST", body: fd })); }
-  catch (err) { $("result").innerHTML = `<div class="errbox">${esc(err.message)}</div>`; }
+  $("docResult").innerHTML = `<div class="card" style="margin-top:14px"><div class="skel" style="height:48px"></div></div>`;
+  try { $("docResult").innerHTML = `<div style="margin-top:14px">${resultHtml(await api("/api/documents", { method: "POST", body: fd }))}</div>`; }
+  catch (err) { $("docResult").innerHTML = `<div class="errbox">${ic("xc")}<span>${esc(err.message)}</span></div>`; }
   $("docBtn").disabled = false;
   loadSubs();
 });
 
-init();
+init().catch((e) => toast("Không tải được dữ liệu: " + e.message, { type: "err" }));
 </script>
 </body>
 </html>

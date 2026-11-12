@@ -20,6 +20,7 @@ from app.case_scoring import (
     target_for,
     upsert_score,
 )
+from app.auth import User, require_analyst
 from app.db import get_session
 from app.models import Case, CaseScore, DataStatus, Framework, Indicator
 
@@ -64,7 +65,7 @@ class ManualIn(BaseModel):
 
 class ScoreReview(BaseModel):
     action: str = Field(pattern="^(approve|reject)$")
-    reviewer: str = Field(min_length=1, max_length=255)
+    reviewer: str | None = Field(None, max_length=255)  # ghi đè bằng người đăng nhập
     note: str | None = Field(None, max_length=2000)
 
 
@@ -187,7 +188,9 @@ def set_manual(case_id: int, body: ManualIn, session: Session = Depends(get_sess
 
 
 @router.post("/{case_id}/scores/{code}/review")
-def review_score(case_id: int, code: str, body: ScoreReview, session: Session = Depends(get_session)):
+def review_score(case_id: int, code: str, body: ScoreReview, session: Session = Depends(get_session),
+                 user: User = Depends(require_analyst)):
+    body.reviewer = user.name
     case = _get(session, case_id)
     cs = session.scalar(select(CaseScore).join(Indicator).where(CaseScore.case_id == case_id, Indicator.code == code))
     if not cs:

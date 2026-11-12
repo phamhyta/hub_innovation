@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.auth import User, require_admin, require_analyst
 from app.db import get_session
 from app.external import COLLECTORS, run_collector
 from app.models import CrawlRun, ExternalEntity
@@ -28,7 +29,7 @@ def collectors(session: Session = Depends(get_session)):
     return out
 
 
-@router.post("/external/collectors/{name}/run")
+@router.post("/external/collectors/{name}/run", dependencies=[Depends(require_admin)])
 def run(name: str, session: Session = Depends(get_session)):
     if name not in COLLECTORS:
         raise HTTPException(404, "Không có bộ thu thập này")
@@ -66,14 +67,15 @@ def suggestions(session: Session = Depends(get_session)):
 
 class SuggestionReview(BaseModel):
     action: str = Field(pattern="^(accept|reject)$")
-    reviewer: str = Field(min_length=1, max_length=255)
+    reviewer: str | None = Field(None, max_length=255)  # ghi đè bằng người đăng nhập
     note: str | None = Field(None, max_length=2000)
 
 
 @router.post("/suggestions/{sid}/review")
-def review_suggestion(sid: int, body: SuggestionReview, session: Session = Depends(get_session)):
+def review_suggestion(sid: int, body: SuggestionReview, session: Session = Depends(get_session),
+                      user: User = Depends(require_analyst)):
     try:
-        return review(session, sid, body.action, body.reviewer.strip(), body.note)
+        return review(session, sid, body.action, user.name, body.note)
     except LookupError as e:
         raise HTTPException(404, str(e)) from e
     except ValueError as e:

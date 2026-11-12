@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sẵn sàng dữ liệu – Dữ liệu Đổi mới sáng tạo</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/common.js"></script>
+<script src="/static/illus.js"></script>
+<style>
+  .ctl { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin: 4px 0 12px; }
+  .ctl .lab { font-size: 12.5px; color: var(--text-3); margin-right: 6px; }
+  .lvl { display: inline-flex; gap: 12px; font-size: 12.5px; color: var(--text-2); margin-left: auto; }
+  .lvl i { display: inline-block; width: 14px; height: 14px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; }
+  .s0 { background: #EEF1F5; box-shadow: inset 0 0 0 1px #D9DEE6; } .s1 { background: var(--ord-1); } .s2 { background: var(--ord-hi); } .sx { background: repeating-linear-gradient(45deg, #fff 0 3px, #EEF1F5 3px 6px); }
+  .lay > * { min-width: 0; }
+  .lay { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+  @media (max-width: 1200px) { .lay { grid-template-columns: minmax(0, 1fr); } }
+  table.hm { border-collapse: separate; border-spacing: 0; width: 100%; }
+  .hm th, .hm td { padding: 0; border: 0; }
+  .hm thead th { font-size: 11.5px; font-weight: 600; color: var(--text-2); vertical-align: bottom; padding: 10px 2px 8px; line-height: 1.25; text-align: center; background: var(--surface); position: sticky; top: 0; }
+  .hm thead th small { display: block; font-weight: 500; color: var(--text-3); margin-top: 2px; }
+  .hm thead th.l { text-align: left; padding-left: 14px; }
+  .hm td.code { padding: 2px 8px 2px 14px; white-space: nowrap; width: 60px; }
+  .hm td.nm { font-size: 12.5px; color: var(--text-2); padding: 2px 12px 2px 0; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hm td.c { width: 62px; padding: 1px; position: relative; }
+  .hm td.c button { display: block; width: 100%; height: 26px; border: 0; border-radius: 4px; cursor: pointer; padding: 0; }
+  .hm td.c button:hover { outline: 2px solid var(--text); outline-offset: -2px; }
+  .hm td.c button.sel { outline: 2px solid var(--text); outline-offset: 1px; }
+  .hm td.tot { text-align: right; font-variant-numeric: tabular-nums; font-size: 12.5px; font-weight: 600; padding: 2px 14px 2px 10px; white-space: nowrap; }
+  .hm td.tot .bar { display: inline-block; width: 40px; height: 6px; border-radius: 3px; background: var(--grid); margin-left: 6px; vertical-align: 1px; overflow: hidden; }
+  .hm td.tot .bar i { display: block; height: 100%; background: var(--ord-hi); }
+  .hm tr.grp td { font-size: 12px; font-weight: 700; color: var(--text-2); padding: 12px 14px 4px; }
+  .hm tbody tr:not(.grp):hover td.code, .hm tbody tr:not(.grp):hover td.nm { background: #F8FAFF; }
+  .aside { position: sticky; top: 76px; display: flex; flex-direction: column; gap: 10px; }
+  .aside h3 { margin: 0; font-size: 15px; line-height: 1.35; }
+  .aside .lv { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; }
+  .aside .lv i { width: 16px; height: 16px; border-radius: 4px; display: inline-block; }
+  .aside .help { font-size: 13px; color: var(--text-2); margin: 0; }
+  .aside .mini { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; }
+  .aside .mini i { height: 12px; border-radius: 2px; }
+  .aside .lim { font-size: 12.5px; color: var(--text-2); background: var(--surface-2); border-radius: 8px; padding: 8px 10px; margin: 0; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+</head>
+<body>
+<main>
+  <div class="sbars" id="sbars"></div>
+  <h2 class="section">Ma trận mức sẵn sàng</h2>
+  <div class="ctl">
+    <span><span class="lab">Sắp xếp</span><span id="sortWrap"></span></span>
+    <span><span class="lab">Nhóm</span><span id="pWrap"></span></span>
+    <span class="lvl" id="lvl"></span>
+  </div>
+  <div class="lay">
+    <div class="table-wrap"><table class="hm" id="hm"></table></div>
+    <aside class="card aside" id="aside" aria-live="polite"></aside>
+  </div>
+  <p class="small muted" id="src"></p>
+</main>
+<script>
+renderHeader("/readiness");
+let data = null, sort = "group", pillar = "", sel = null;
+const LV = { 0: "Không đủ", 1: "Một phần", 2: "Đạt" };
+const cls = (s) => s == null ? "sx" : "s" + s;
+
+function render() {
+  const dims = data.dimensions, n = dims.length;
+  let rows = data.rows.filter((r) => !pillar || r.pillar === pillar);
+  if (sort === "score") rows = [...rows].sort((a, b) => (b.total ?? -1) - (a.total ?? -1) || a.code.localeCompare(b.code));
+  let html = `<thead><tr><th class="l" colspan="2">Chỉ tiêu</th>${dims.map((d) => `<th title="${esc(d.help || "")}">${esc(d.label)}<small>${d.adequate} đạt</small></th>`).join("")}<th>Tổng</th></tr></thead><tbody>`;
+  let grp = null;
+  rows.forEach((r) => {
+    if (sort === "group" && r.pillar_label !== grp) { grp = r.pillar_label; html += `<tr class="grp"><td colspan="${n + 3}">${esc(grp || "Khác")}</td></tr>`; }
+    html += `<tr><td class="code"><a href="/indicator?code=${encodeURIComponent(r.code)}"><span class="code">${esc(r.code)}</span></a></td>
+      <td class="nm" title="${esc(r.name)}">${esc(r.name)}</td>
+      ${r.cells.map((c, j) => `<td class="c"><button type="button" class="${cls(c.score)} ${sel && sel[0] === r.code && sel[1] === j ? "sel" : ""}" data-r="${esc(r.code)}" data-j="${j}"
+        aria-label="${esc(`${r.code} – ${dims[j].label}: ${c.level_vi || "chưa đánh giá"}`)}" title="${esc(`${dims[j].label}: ${c.level_vi || "chưa đánh giá"}`)}"><span class="sr">${esc(c.level_vi || "")}</span></button></td>`).join("")}
+      <td class="tot">${r.total ?? "–"}<small class="muted">/${r.max}</small><span class="bar"><i style="width:${(r.total || 0) / r.max * 100}%"></i></span></td></tr>`;
+  });
+  $("hm").innerHTML = html + "</tbody>";
+  $("hm").querySelectorAll("button[data-r]").forEach((b) => b.onclick = () => { sel = [b.dataset.r, +b.dataset.j]; render(); });
+  renderAside();
+}
+
+function renderAside() {
+  const dims = data.dimensions;
+  if (!sel) {
+    const tot = data.rows.flatMap((r) => r.cells).filter((c) => c.score != null);
+    const cnt = [0, 1, 2].map((s) => tot.filter((c) => c.score === s).length);
+    $("aside").innerHTML = `<h3>Bấm vào một ô để xem ghi chú</h3>
+      <p class="help">${data.rows.length} chỉ tiêu × ${dims.length} chiều = ${tot.length} ô đánh giá.</p>
+      ${[2, 1, 0].map((s) => `<div class="lv"><i class="s${s}"></i>${LV[s]}<span class="muted" style="font-weight:500">${cnt[s]} ô (${fmt(cnt[s] / tot.length * 100, 1)}%)</span></div>`).join("")}
+      <p class="help">Chiều yếu nhất: <b>${esc([...dims].sort((a, b) => a.adequate - b.adequate)[0].label)}</b> (${[...dims].sort((a, b) => a.adequate - b.adequate)[0].adequate}/${data.rows.length} chỉ tiêu đạt).</p>`;
+    return;
+  }
+  const r = data.rows.find((x) => x.code === sel[0]), c = r.cells[sel[1]], d = dims[sel[1]];
+  $("aside").innerHTML = `<div class="small muted">${esc(r.pillar_label || "")} · ${dataStatus(r.data_status)}</div>
+    <h3><a href="/indicator?code=${encodeURIComponent(r.code)}"><span class="code">${esc(r.code)}</span></a> ${esc(r.name)}</h3>
+    <div><div class="small muted">${esc(d.label)}</div><div class="lv"><i class="${cls(c.score)}"></i>${esc(c.level_vi || "Chưa đánh giá")}</div></div>
+    <p class="help">${esc(d.help || "")}</p>
+    <div><div class="small muted" style="margin-bottom:4px">Cả 8 chiều · tổng ${r.total ?? "–"}/${r.max}</div>
+      <div class="mini">${r.cells.map((x, j) => `<i class="${cls(x.score)}" title="${esc(dims[j].label + ": " + (x.level_vi || "–"))}"></i>`).join("")}</div></div>
+    ${r.limitation ? `<div><div class="small muted" style="margin-bottom:4px">Hạn chế ghi trong báo cáo <span class="tag" style="height:18px">EN</span></div><p class="lim" lang="en">${esc(r.limitation)}</p></div>` : ""}
+    <button class="btn sm" id="clr">${ic("x")}Bỏ chọn</button>`;
+  $("clr").onclick = () => { sel = null; render(); };
+}
+
+$("sortWrap").innerHTML = segHtml("srt", [["group", "Theo nhóm"], ["score", "Theo tổng điểm"]], sort, "Sắp xếp");
+onSeg("srt", (v) => { sort = v; render(); });
+$("pWrap").innerHTML = segHtml("pl", [["", "Tất cả"], ["input", "Đầu vào"], ["output", "Đầu ra"], ["efficiency", "Hiệu quả"], ["impact", "Tác động"]], "", "Lọc theo nhóm");
+onSeg("pl", (v) => { pillar = v; render(); });
+$("lvl").innerHTML = [2, 1, 0].map((s) => `<span><i class="s${s}"></i>${LV[s]}</span>`).join("");
+api("/api/readiness").then((d) => {
+  data = d;
+  $("sbars").innerHTML = statusBarsHtml(d.status_summary);
+  $("src").textContent = "Nguồn: " + d.source + ".";
+  render();
+}).catch((e) => toast("Không tải được dữ liệu: " + e.message, { type: "err" }));
+</script>
+</body>
+</html>

@@ -1,15 +1,19 @@
-"""Dựng lại TOÀN BỘ dữ liệu demo từ đầu (cần Internet).
+"""Dựng lại TOÀN BỘ dữ liệu demo từ đầu.
 
-    uv run python -m scripts.reset_demo --yes
+    uv run python -m scripts.reset_demo --yes [--offline]
 
 ⚠ XOÁ toàn bộ dữ liệu trong DATABASE_URL hiện tại và thư mục STORAGE_DIR, rồi:
  1. import registry + sinh template + sinh tin tuyển dụng giả lập
- 2. chạy 7 connector
- 3. nộp 3 file mẫu (toàn quốc, Hà Nội, file lỗi)
- 4. duyệt sẵn một phần (file toàn quốc + số liệu toàn quốc của OpenAlex/Cục SHTT/World Bank) với
-    người duyệt "seed-demo"; để lại Hà Nội, NEAC và số liệu theo tỉnh ở trạng thái chờ duyệt để demo
- 5. tạo case demo
- 6. chạy 6 bộ thu thập dữ liệu ngoài + sinh đề xuất tiêu chí (chưa chấp nhận – để demo trực tiếp)
+ 2. nhập file dữ liệu chuẩn của Cục (data/seed/seed_data_2244.xlsx) – nguồn chính thức cho 46 chỉ tiêu
+ 3. chạy connector: API hệ thống thống kê – bộ 137 (mô phỏng, không cần Internet; tính lại chỉ tiêu 2244
+    trùng và đối soát) và 7 nguồn quốc tế / tham chiếu (cần Internet)
+ 4. nộp 2 file mẫu của đơn vị (Hà Nội – giả lập, file lỗi) để demo luồng kiểm tra biểu mẫu
+ 5. duyệt sẵn số liệu toàn quốc của OpenAlex/Cục SHTT/World Bank với người duyệt "seed-demo";
+    để lại Hà Nội, NEAC và số liệu theo tỉnh ở trạng thái chờ duyệt để demo
+ 6. tạo case demo
+ 7. chạy 6 bộ thu thập dữ liệu ngoài + sinh đề xuất tiêu chí (cần Internet)
+
+--offline: bỏ qua các bước cần Internet (7 nguồn ở bước 3, và bước 7).
 """
 
 import shutil
@@ -53,30 +57,39 @@ def main() -> None:
     finally:
         sys.argv = sys_argv
 
+    from app.seed_import import import_seed
+
+    with SessionLocal() as s:
+        step("Nhập file dữ liệu chuẩn của Cục")
+        r = import_seed(s, settings.seed_path, imported_by="reset_demo")
+        print(f"  {r.file_name}: {dict(r.observations)} · bảng phụ {r.tables}")
+        for w in r.warnings:
+            print(f"  ⚠ {w}")
+    offline = "--offline" in sys.argv
+
     from app.connectors import REGISTRY
     from app.connectors.runner import run_connector
     from app.submissions import ingest_template
 
     failed = []
     with SessionLocal() as s:
-        step("Chạy 7 connector")
-        for name in REGISTRY:
+        step("Chạy connector" + (" (--offline: chỉ nguồn không cần Internet)" if offline else ""))
+        for name in [n for n, c in REGISTRY.items() if not offline or not c.requires_network]:
             run = run_connector(s, name, trigger="cli")
             print(f"  {name:10s} {run.status:8s} {run.stats}" + (f"  LỖI: {run.error}" if run.error else ""))
             if run.status != "success":
                 failed.append(name)
 
-        step("Nộp 3 file mẫu")
+        step("Nộp 2 file mẫu của đơn vị")
         subs = {}
-        for f in sorted(SAMPLES.glob("TPL-*.xlsx")):
+        # File toàn quốc giả lập không còn được nộp: số toàn quốc lấy từ file của Cục
+        for f in sorted(p for p in SAMPLES.glob("TPL-*.xlsx") if "CucThongTin" not in p.name):
             sub = ingest_template(s, f.read_bytes(), f.name, submitted_by="seed-demo")
             subs[f.name] = sub
             print(f"  {f.name}: {sub.status.value}")
 
         step("Duyệt sẵn một phần")
-        national = next(v for k, v in subs.items() if "CucThongTin" in k)
-        ids = [p.id for p in s.scalars(select(DataPoint).where(DataPoint.submission_id == national.id))]
-        ids += [p.id for p in s.scalars(select(DataPoint).where(
+        ids = [p.id for p in s.scalars(select(DataPoint).where(
             DataPoint.origin.in_(["crawler:openalex", "crawler:ipvn", "crawler:worldbank"]),
             DataPoint.geography == NATIONAL, DataPoint.status == DataStatus.NEEDS_REVIEW, DataPoint.is_current.is_(True)))]
         r = review_points(s, ids, "approve", SEED_REVIEWER, "Duyệt sẵn cho dữ liệu demo")
@@ -97,8 +110,8 @@ def main() -> None:
     from app.suggestions import generate
 
     with SessionLocal() as s:
-        step("Dữ liệu ngoài + đề xuất tiêu chí")
-        for name in COLLECTORS:
+        step("Dữ liệu ngoài + đề xuất tiêu chí" + (" – bỏ qua (--offline)" if offline else ""))
+        for name in ([] if offline else COLLECTORS):
             run = run_collector(s, name, trigger="cli")
             print(f"  {name:16s} {run.status:8s}" + (f"  LỖI: {run.error}" if run.error else ""))
             if run.status != "success":

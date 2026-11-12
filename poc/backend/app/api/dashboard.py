@@ -7,10 +7,16 @@ from sqlalchemy.orm import Session
 
 from app.analytics import indicator_series, overview
 from app.db import get_session
+from app.home import build_home, readiness_of
 from app.models import Indicator
 from app.reports import build_report
 
 router = APIRouter(prefix="/api", tags=["dashboard"])
+
+
+@router.get("/home")
+def home(session: Session = Depends(get_session)):
+    return build_home(session)
 
 
 @router.get("/dashboard")
@@ -23,7 +29,9 @@ def series(code: str, geography: str = "Toàn quốc", session: Session = Depend
     ind = session.scalar(select(Indicator).where(Indicator.code == code))
     if not ind:
         raise HTTPException(404, f"Không tìm thấy chỉ tiêu {code}")
-    return indicator_series(session, ind, geography)
+    out = indicator_series(session, ind, geography)
+    out["readiness"] = readiness_of(session, ind.code)
+    return out
 
 
 @router.get("/reports/indicators.xlsx")

@@ -1,0 +1,1607 @@
+{
+ "nguon": "Mô phỏng API hệ thống thống kê (dữ liệu mẫu trong file seed)",
+ "chi_tieu": [
+  {
+   "ma": "137-M01",
+   "ten": "Số đơn đăng ký sáng chế, GPHI của tổ chức, cá nhân VN",
+   "don_vi": "đơn",
+   "tan_suat": "M",
+   "quy_tac_gop": "sum",
+   "gia_lap": true
+  },
+  {
+   "ma": "137-M02",
+   "ten": "Số văn bằng sáng chế, GPHI cấp cho tổ chức, cá nhân VN",
+   "don_vi": "văn bằng",
+   "tan_suat": "M",
+   "quy_tac_gop": "sum",
+   "gia_lap": true
+  },
+  {
+   "ma": "137-M03",
+   "ten": "Số hợp đồng chuyển giao công nghệ được đăng ký/cấp phép",
+   "don_vi": "hợp đồng",
+   "tan_suat": "M",
+   "quy_tac_gop": "sum",
+   "gia_lap": true
+  },
+  {
+   "ma": "137-M04",
+   "ten": "Số giao dịch qua NDXP",
+   "don_vi": "triệu giao dịch",
+   "tan_suat": "M",
+   "quy_tac_gop": "sum",
+   "gia_lap": true
+  },
+  {
+   "ma": "137-M05",
+   "ten": "Số chứng thư chữ ký số đã cấp (luỹ kế)",
+   "don_vi": "chứng thư",
+   "tan_suat": "M",
+   "quy_tac_gop": "last",
+   "gia_lap": true
+  },
+  {
+   "ma": "137-M06",
+   "ten": "Số doanh nghiệp KH&CN được cấp giấy chứng nhận",
+   "don_vi": "doanh nghiệp",
+   "tan_suat": "M",
+   "quy_tac_gop": "sum",
+   "gia_lap": true
+  },
+  {
+   "ma": "137-M07",
+   "ten": "Số nhiệm vụ KH&CN cấp quốc gia được nghiệm thu",
+   "don_vi": "nhiệm vụ",
+   "tan_suat": "M",
+   "quy_tac_gop": "sum",
+   "gia_lap": true
+  },
+  {
+   "ma": "137-M08",
+   "ten": "Số tổ chức KH&CN đăng ký hoạt động mới",
+   "don_vi": "tổ chức",
+   "tan_suat": "M",
+   "quy_tac_gop": "sum",
+   "gia_lap": true
+  }
+ ],
+ "du_lieu": [
+  {
+   "ma": "137-M01",
+   "ky": "2024-01",
+   "gia_tri": 134,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2024-02",
+   "gia_tri": 128,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2024-03",
+   "gia_tri": 144,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2024-04",
+   "gia_tri": 154,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2024-05",
+   "gia_tri": 176,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2024-06",
+   "gia_tri": 156,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2024-07",
+   "gia_tri": 145,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2024-08",
+   "gia_tri": 151,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2024-09",
+   "gia_tri": 159,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2024-10",
+   "gia_tri": 205,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2024-11",
+   "gia_tri": 170,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2024-12",
+   "gia_tri": 174,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2025-01",
+   "gia_tri": 188,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2025-02",
+   "gia_tri": 187,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2025-03",
+   "gia_tri": 167,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2025-04",
+   "gia_tri": 210,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2025-05",
+   "gia_tri": 234,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2025-06",
+   "gia_tri": 248,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2025-07",
+   "gia_tri": 195,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2025-08",
+   "gia_tri": 194,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2025-09",
+   "gia_tri": 193,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2025-10",
+   "gia_tri": 252,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2025-11",
+   "gia_tri": 278,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M01",
+   "ky": "2025-12",
+   "gia_tri": 241,
+   "don_vi": "đơn",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2024-01",
+   "gia_tri": 41,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2024-02",
+   "gia_tri": 47,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2024-03",
+   "gia_tri": 41,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2024-04",
+   "gia_tri": 57,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2024-05",
+   "gia_tri": 51,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2024-06",
+   "gia_tri": 58,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2024-07",
+   "gia_tri": 47,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2024-08",
+   "gia_tri": 49,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2024-09",
+   "gia_tri": 53,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2024-10",
+   "gia_tri": 60,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2024-11",
+   "gia_tri": 62,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2024-12",
+   "gia_tri": 55,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2025-01",
+   "gia_tri": 83,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2025-02",
+   "gia_tri": 87,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2025-03",
+   "gia_tri": 88,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2025-04",
+   "gia_tri": 95,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2025-05",
+   "gia_tri": 102,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2025-06",
+   "gia_tri": 96,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2025-07",
+   "gia_tri": 91,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2025-08",
+   "gia_tri": 106,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2025-09",
+   "gia_tri": 101,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2025-10",
+   "gia_tri": 105,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2025-11",
+   "gia_tri": 93,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M02",
+   "ky": "2025-12",
+   "gia_tri": 111,
+   "don_vi": "văn bằng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2024-01",
+   "gia_tri": 8,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2024-02",
+   "gia_tri": 8,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2024-03",
+   "gia_tri": 6,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2024-04",
+   "gia_tri": 8,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2024-05",
+   "gia_tri": 9,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2024-06",
+   "gia_tri": 10,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2024-07",
+   "gia_tri": 10,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2024-08",
+   "gia_tri": 10,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2024-09",
+   "gia_tri": 10,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2024-10",
+   "gia_tri": 10,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2024-11",
+   "gia_tri": 11,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2024-12",
+   "gia_tri": 10,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2025-01",
+   "gia_tri": 9,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2025-02",
+   "gia_tri": 9,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2025-03",
+   "gia_tri": 8,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2025-04",
+   "gia_tri": 11,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2025-05",
+   "gia_tri": 11,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2025-06",
+   "gia_tri": 9,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2025-07",
+   "gia_tri": 9,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2025-08",
+   "gia_tri": 9,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2025-09",
+   "gia_tri": 9,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2025-10",
+   "gia_tri": 12,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2025-11",
+   "gia_tri": 13,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M03",
+   "ky": "2025-12",
+   "gia_tri": 12,
+   "don_vi": "hợp đồng",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2024-01",
+   "gia_tri": 75,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2024-02",
+   "gia_tri": 75,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2024-03",
+   "gia_tri": 74,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2024-04",
+   "gia_tri": 90,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2024-05",
+   "gia_tri": 91,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2024-06",
+   "gia_tri": 88,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2024-07",
+   "gia_tri": 99,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2024-08",
+   "gia_tri": 95,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2024-09",
+   "gia_tri": 101,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2024-10",
+   "gia_tri": 116,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2024-11",
+   "gia_tri": 112,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2024-12",
+   "gia_tri": 108,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2025-01",
+   "gia_tri": 93,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2025-02",
+   "gia_tri": 100,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2025-03",
+   "gia_tri": 89,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2025-04",
+   "gia_tri": 100,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2025-05",
+   "gia_tri": 110,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2025-06",
+   "gia_tri": 95,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2025-07",
+   "gia_tri": 121,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2025-08",
+   "gia_tri": 109,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2025-09",
+   "gia_tri": 114,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2025-10",
+   "gia_tri": 126,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2025-11",
+   "gia_tri": 111,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M04",
+   "ky": "2025-12",
+   "gia_tri": 108,
+   "don_vi": "triệu giao dịch",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2024-01",
+   "gia_tri": 23862871,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2024-02",
+   "gia_tri": 23979365,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2024-03",
+   "gia_tri": 24095859,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2024-04",
+   "gia_tri": 24215233,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2024-05",
+   "gia_tri": 24334607,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2024-06",
+   "gia_tri": 24453982,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2024-07",
+   "gia_tri": 24528037,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2024-08",
+   "gia_tri": 24602092,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2024-09",
+   "gia_tri": 24676148,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2024-10",
+   "gia_tri": 24805242,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2024-11",
+   "gia_tri": 24934336,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2024-12",
+   "gia_tri": 25063431,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2025-01",
+   "gia_tri": 25162548,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2025-02",
+   "gia_tri": 25261666,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2025-03",
+   "gia_tri": 25360784,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2025-04",
+   "gia_tri": 25516170,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2025-05",
+   "gia_tri": 25671556,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2025-06",
+   "gia_tri": 25826943,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2025-07",
+   "gia_tri": 25929160,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2025-08",
+   "gia_tri": 26031377,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2025-09",
+   "gia_tri": 26133595,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2025-10",
+   "gia_tri": 26240240,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2025-11",
+   "gia_tri": 26346885,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M05",
+   "ky": "2025-12",
+   "gia_tri": 26453531,
+   "don_vi": "chứng thư",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2024-01",
+   "gia_tri": 20,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2024-02",
+   "gia_tri": 20,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2024-03",
+   "gia_tri": 19,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2024-04",
+   "gia_tri": 23,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2024-05",
+   "gia_tri": 22,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2024-06",
+   "gia_tri": 23,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2024-07",
+   "gia_tri": 20,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2024-08",
+   "gia_tri": 20,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2024-09",
+   "gia_tri": 20,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2024-10",
+   "gia_tri": 17,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2024-11",
+   "gia_tri": 18,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2024-12",
+   "gia_tri": 18,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2025-01",
+   "gia_tri": 22,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2025-02",
+   "gia_tri": 22,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2025-03",
+   "gia_tri": 23,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2025-04",
+   "gia_tri": 18,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2025-05",
+   "gia_tri": 19,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2025-06",
+   "gia_tri": 19,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2025-07",
+   "gia_tri": 22,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2025-08",
+   "gia_tri": 23,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2025-09",
+   "gia_tri": 24,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2025-10",
+   "gia_tri": 19,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2025-11",
+   "gia_tri": 18,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M06",
+   "ky": "2025-12",
+   "gia_tri": 18,
+   "don_vi": "doanh nghiệp",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2024-01",
+   "gia_tri": 16,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2024-02",
+   "gia_tri": 18,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2024-03",
+   "gia_tri": 17,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2024-04",
+   "gia_tri": 13,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2024-05",
+   "gia_tri": 15,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2024-06",
+   "gia_tri": 16,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2024-07",
+   "gia_tri": 15,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2024-08",
+   "gia_tri": 18,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2024-09",
+   "gia_tri": 17,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2024-10",
+   "gia_tri": 15,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2024-11",
+   "gia_tri": 16,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2024-12",
+   "gia_tri": 15,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2025-01",
+   "gia_tri": 15,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2025-02",
+   "gia_tri": 14,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2025-03",
+   "gia_tri": 15,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2025-04",
+   "gia_tri": 15,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2025-05",
+   "gia_tri": 17,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2025-06",
+   "gia_tri": 15,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2025-07",
+   "gia_tri": 15,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2025-08",
+   "gia_tri": 18,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2025-09",
+   "gia_tri": 17,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2025-10",
+   "gia_tri": 18,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2025-11",
+   "gia_tri": 18,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M07",
+   "ky": "2025-12",
+   "gia_tri": 19,
+   "don_vi": "nhiệm vụ",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2024-01",
+   "gia_tri": 41,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2024-02",
+   "gia_tri": 43,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2024-03",
+   "gia_tri": 36,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2024-04",
+   "gia_tri": 41,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2024-05",
+   "gia_tri": 36,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2024-06",
+   "gia_tri": 36,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2024-07",
+   "gia_tri": 44,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2024-08",
+   "gia_tri": 41,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2024-09",
+   "gia_tri": 43,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2024-10",
+   "gia_tri": 37,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2024-11",
+   "gia_tri": 37,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2024-12",
+   "gia_tri": 41,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2025-01",
+   "gia_tri": 42,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2025-02",
+   "gia_tri": 45,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2025-03",
+   "gia_tri": 41,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2025-04",
+   "gia_tri": 36,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2025-05",
+   "gia_tri": 36,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2025-06",
+   "gia_tri": 39,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2025-07",
+   "gia_tri": 48,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2025-08",
+   "gia_tri": 50,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2025-09",
+   "gia_tri": 45,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2025-10",
+   "gia_tri": 38,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2025-11",
+   "gia_tri": 36,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  },
+  {
+   "ma": "137-M08",
+   "ky": "2025-12",
+   "gia_tri": 37,
+   "don_vi": "tổ chức",
+   "gia_lap": true,
+   "che_do": "Chế độ báo cáo thống kê"
+  }
+ ]
+}

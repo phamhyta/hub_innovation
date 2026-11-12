@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chỉ tiêu thống kê – Dữ liệu Đổi mới sáng tạo</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/common.js"></script>
+<script src="/static/illus.js"></script>
+<script src="/static/charts.js"></script>
+<style>
+  .ctl { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-bottom: 14px; }
+  .ctl .lab { font-size: 12.5px; color: var(--text-3); margin-right: 6px; }
+  .ctl input.field { min-width: 220px; }
+  .ts td { vertical-align: middle; }
+  .ts .nm { font-weight: 500; }
+  .ts .nm .tags { margin-top: 3px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .ts .val { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ts .val small { color: var(--text-3); font-weight: 500; margin-left: 3px; }
+  .ts tr.click { cursor: pointer; }
+  .ts tr.click:hover td { background: #F8FAFF; }
+  @media (max-width: 600px) { .ctl input.field { min-width: 0; width: 100%; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="infobox" id="banner"></div>
+  <div class="ctl" id="ctl"></div>
+  <div class="table-wrap"><table class="ts">
+    <thead><tr><th style="width:84px">Mã</th><th>Chỉ tiêu</th><th class="hide-sm" style="width:90px">Kỳ</th><th class="num" style="width:160px">Giá trị</th><th class="num" style="width:110px" id="chHead">Thay đổi</th><th class="hide-sm" style="width:140px">Xu hướng</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table></div>
+  <p class="small muted" id="note"></p>
+</main>
+<script>
+renderHeader("/s137");
+const state = { res: "M", window: 12, change: "pop", q: "", overlap: "" };
+$("banner").innerHTML = `${ic("info")}<span>Số liệu nhận qua adapter API mô phỏng (dữ liệu mẫu ${simBadge()}). Khi có đặc tả API của hệ thống thống kê, adapter được thay thế mà không đổi giao diện.</span>`;
+$("ctl").innerHTML =
+  `<input class="field" id="q" type="search" placeholder="Tìm mã hoặc tên chỉ tiêu" aria-label="Tìm chỉ tiêu">` +
+  `<span><span class="lab">Trùng 2244</span>${segHtml("ov", [["", "Tất cả"], ["true", "Có"], ["false", "Không"]], "", "Lọc chỉ tiêu trùng 2244")}</span>` +
+  `<span><span class="lab">Kỳ</span>${segHtml("res", [["M", "Tháng"], ["Q", "Quý"], ["Y", "Năm"]], state.res, "Độ phân giải")}</span>` +
+  `<span><span class="lab">Cửa sổ</span>${segHtml("win", [[4, "4 kỳ"], [6, "6 kỳ"], [12, "12 kỳ"]], state.window, "Số kỳ gần nhất")}</span>` +
+  `<span><span class="lab">Thay đổi</span>${segHtml("chg", [["pop", "So với kỳ trước"], ["yoy", "Cùng kỳ năm trước"], ["ytd", "Luỹ kế"]], state.change, "Mức thay đổi")}</span>`;
+onSeg("ov", (v) => { state.overlap = v; load(); });
+onSeg("res", (v) => { state.res = v; load(); });
+onSeg("win", (v) => { state.window = +v; load(); });
+onSeg("chg", (v) => { state.change = v; load(); });
+let t; $("q").addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => { state.q = $("q").value.trim(); load(); }, 200); });
+$("rows").innerHTML = skeletonRows(8, 6);
+
+async function load() {
+  const p = new URLSearchParams({ res: state.res, window: state.window, change: state.change });
+  if (state.q) p.set("q", state.q);
+  if (state.overlap) p.set("overlap", state.overlap);
+  const d = await api("/api/sets/137/indicators?" + p);
+  $("chHead").textContent = { pop: { M: "MoM", Q: "QoQ", Y: "YoY" }[state.res], yoy: "YoY", ytd: "YTD" }[state.change];
+  $("rows").innerHTML = d.items.map((x, i) => {
+    const l = x.latest;
+    const v = !l ? "–" : `${fmt(l.value, 3)}<small>${esc(x.unit || "")}</small>`;
+    const tags = [x.simulated ? simBadge() : "", `<span class="tag">Gộp: ${esc({ sum: "tổng", avg: "trung bình", last: "kỳ cuối" }[x.rule] || x.rule || "–")}</span>`,
+      x.overlap.length ? `<span class="tag" title="Dùng để tính lại chỉ tiêu 2244">Trùng 2244: ${x.overlap.map(esc).join(", ")}</span>` : ""].join("");
+    return `<tr class="click" data-code="${esc(x.code)}"><td><span class="code">${esc(x.code)}</span></td>
+      <td><div class="nm">${esc(x.name)}<div class="tags">${tags}</div></div></td>
+      <td class="hide-sm small">${l ? esc(l.period) : "–"}</td><td class="num val">${v}${x.ytd != null ? `<div class="small muted">Luỹ kế: ${fmt(x.ytd, 0)}</div>` : ""}</td>
+      <td class="num">${pctTag(x.change, x.change_label)}</td><td class="hide-sm"><span id="sp${i}"></span></td></tr>`;
+  }).join("") || `<tr><td colspan="6">${emptyState("Không có chỉ tiêu phù hợp", "search")}</td></tr>`;
+  d.items.forEach((x, i) => x.spark.length > 1 && sparkline($("sp" + i), x.spark, { dashed: x.simulated }));
+  document.querySelectorAll("tr.click").forEach((tr) => tr.onclick = () => location.href = "/indicator?code=" + encodeURIComponent(tr.dataset.code));
+  $("note").textContent = `${d.items.length} chỉ tiêu.` + (state.change === "ytd" ? " Luỹ kế chỉ áp dụng cho chỉ tiêu có quy tắc gộp tổng; so với cùng kỳ năm trước." : "");
+}
+load().catch((e) => toast("Không tải được dữ liệu: " + e.message, { type: "err" }));
+</script>
+</body>
+</html>
