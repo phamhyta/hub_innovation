@@ -28,4 +28,33 @@ if "DATABASE_URL" not in os.environ:
 os.environ.setdefault("STORAGE_DIR", str(RUNTIME / "storage"))
 os.environ.setdefault("ENABLE_SCHEDULER", "false")  # serverless: không có tiến trình chạy nền
 
-from app.main import app  # noqa: E402,F401
+from urllib.parse import parse_qsl, quote, urlencode  # noqa: E402
+
+from app.main import app  # noqa: E402
+
+
+class RestoreOriginalPath:
+    """vercel.json rewrite mọi đường dẫn về /api/index?__path=<đường dẫn gốc>.
+
+    Runtime Python của Vercel có thể truyền vào app đường dẫn ĐÃ rewrite (/api/index) thay vì
+    đường dẫn người dùng gọi → mọi route 404. Middleware này khôi phục đường dẫn gốc từ __path
+    (và bỏ __path khỏi query) trước khi FastAPI định tuyến.
+    """
+
+    def __init__(self, asgi):
+        self.asgi = asgi
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] in ("http", "websocket"):
+            query = parse_qsl(scope.get("query_string", b"").decode("latin-1"), keep_blank_values=True)
+            original = next((v for k, v in query if k == "__path"), None)
+            if original is not None:
+                path = "/" + original.lstrip("/")
+                rest = urlencode([(k, v) for k, v in query if k != "__path"])
+                scope = {**scope, "path": path, "raw_path": quote(path).encode(), "query_string": rest.encode()}
+            elif scope.get("path") in ("/api/index", "/api/index.py"):
+                scope = {**scope, "path": "/", "raw_path": b"/"}
+        await self.asgi(scope, receive, send)
+
+
+app.add_middleware(RestoreOriginalPath)

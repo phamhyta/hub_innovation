@@ -6,5 +6,5 @@
       "includeFiles": "poc/{backend/app,backend/scripts,data/raw,data/external,templates,sample_data,deploy}/**"
     }
   },
-  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }]
+  "rewrites": [{ "source": "/(.*)", "destination": "/api/index?__path=/$1" }]
 }
